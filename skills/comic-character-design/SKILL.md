@@ -7,6 +7,8 @@ description: Use when designing or reviewing reusable comic character references
 
 Follow the [shared contract](../../references/production-contract.md). Use [identity lock](../../references/identity-lock.md), [distinctiveness](../../references/character-distinctiveness.md) and [introductions](../../references/character-introduction.md) for their schemas.
 
+Reference images come from image_gen only; in Claude Code call it through the Codex CLI ([codex-cli-imagegen](../../references/codex-cli-imagegen.md)).
+
 Give each principal/supporting character a stable ID and approved individual image with face, hair, age/state, body, costume, relationships and three independent recognition signals. Respect the series' design direction and current source wardrobe. Include an acting palette: recognition remains stable while expression/pose changes. New expression sheets are justified only when existing evidence cannot support the needed acting.
 
 Review original full-size and face-only pixels for beauty/design intent, anatomy/materials/context and the complete unordered non-crowd pair matrix. Record genuine native reference evidence (`full_size_checked`, method, original path and hash). Reuse an unchanged pair's authentic review only when its reference hashes and applicable design scope are unchanged; review affected pairs after a change, and retain original timestamps. The complete pair matrix must remain valid. Freeze before render; changed references invalidate affected art and require genuine edits plus fresh page QA.

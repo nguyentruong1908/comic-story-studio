@@ -9,7 +9,7 @@ metadata:
 
 Follow the [shared contract](../../references/production-contract.md). Use [identity lock](../../references/identity-lock.md), [research context](../../references/research-world-style.md), [lettering prompt rules](../../references/lettering-prompt.md) and relevant [action/expression](../../references/action-expression.md) schemas.
 
-Render only after source, design, storyboard and current design gates pass. Freeze the exact approved source/reference/context snapshot before genuine calls. Produce assigned pages with image_gen only; retain actual arguments, input/original hashes, clocks and failed attempts.
+Render only after source, design, storyboard and current design gates pass. Freeze the exact approved source/reference/context snapshot before genuine calls. Produce assigned pages with image_gen only; retain actual arguments, input/original hashes, clocks and failed attempts. Without a native image_gen tool (Claude Code), call it through the Codex CLI as in [codex-cli-imagegen](../../references/codex-cli-imagegen.md).
 
 Compile a concise page prompt: shared style once, concrete current shots/states/acting, exact dialogue/unit realizations, visible IDs/reference bindings and relevant negative locks. Avoid duplicate field aliases and entire asset histories. Keep literal scoped research blocks required by the validator; make those blocks concise during planning, not by editing a frozen block mid-render.
 

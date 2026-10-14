@@ -7,6 +7,8 @@ description: Use when a comic chapter has passed full QA and needs to be package
 
 Follow the [shared contract](../../references/production-contract.md), [QA gates](../../references/qa-gates.md) and [chapter package contract](../../references/manifest-contract.md#chapter-package).
 
+Plugin root for commands: `${CLAUDE_PLUGIN_ROOT}` (Claude Code) or the folder two levels above this file; written as `<plugin>` below.
+
 Package only a chapter whose every planned page exists, passed independent native review, and whose user review is approved or explicitly deferred. Run the full gate on the current inputs and keep its receipt with the chapter QA evidence:
 
 ```

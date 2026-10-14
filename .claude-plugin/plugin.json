@@ -1,0 +1,38 @@
+{
+  "name": "comic-story-studio",
+  "version": "0.3.0",
+  "description": "Research-first comic production: source analysis, world and character design, image_gen production, independent native QA and verified chapter packages.",
+  "author": {
+    "name": "nguyentruong1908"
+  },
+  "homepage": "https://github.com/nguyentruong1908/comic-story-studio",
+  "repository": "https://github.com/nguyentruong1908/comic-story-studio",
+  "license": "MIT",
+  "keywords": [
+    "action-expression",
+    "art-direction",
+    "asset-design",
+    "character-design",
+    "character-introduction",
+    "comic",
+    "continuity",
+    "crowd-separation",
+    "dialogue-fidelity",
+    "image-generation",
+    "internet-research",
+    "manga",
+    "manhua",
+    "non-reference-cast",
+    "paragraph-completeness",
+    "parallel-agents",
+    "production-plan",
+    "quality-assurance",
+    "chapter-packaging",
+    "story-analysis",
+    "storyboard",
+    "webtoon",
+    "world-design",
+    "agent-context",
+    "series-workspace"
+  ]
+}

@@ -6,7 +6,8 @@ import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 const digest = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const generatedRoot = path.join(os.homedir(), '.codex', 'generated_images');
+// Codex (and Claude Code calling the Codex CLI) saves image_gen output under $CODEX_HOME.
+const generatedRoot = path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'generated_images');
 // allowedRoot is injectable only by unit tests, never by CLI/manifest flags.
 export function validateImagegenProvenance(root, manifest, allowedRoot = generatedRoot) {
   const errors = [];

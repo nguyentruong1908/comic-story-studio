@@ -28,6 +28,7 @@ try {
   assert.ok(fs.statSync(path.join(dir, 'packages')).isDirectory());
   assert.ok(!('reader' in config) && !('reader_root' in initialized) && !('publish_root' in initialized));
   assert.ok(!/status:\s*approved/.test(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8')));
+  assert.equal(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n', 'Claude Code imports the series rules');
   cases++;
   fail(run('init', root, 'space-comic'), /already exists/);
   assert.equal(hash(index), before); cases++;

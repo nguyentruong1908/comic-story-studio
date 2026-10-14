@@ -1,0 +1,17 @@
+{
+  "name": "comic-story-studio",
+  "owner": {
+    "name": "nguyentruong1908"
+  },
+  "metadata": {
+    "description": "Comic Story Studio: research-first comic production skills from source analysis to packaged chapters."
+  },
+  "plugins": [
+    {
+      "name": "comic-story-studio",
+      "source": "./",
+      "description": "Research-first comic production: source analysis, world and character design, image_gen production, independent native QA and verified chapter packages.",
+      "version": "0.3.0"
+    }
+  ]
+}

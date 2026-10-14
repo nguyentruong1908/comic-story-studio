@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "tool_call_id", "operation", "original_output_path", "referenced_image_paths", "error"],
+  "properties": {
+    "status": {"type": "string", "enum": ["generated", "failed"]},
+    "tool_call_id": {"type": "string"},
+    "operation": {"type": "string", "enum": ["generate", "edit"]},
+    "original_output_path": {"type": "string"},
+    "referenced_image_paths": {"type": "array", "items": {"type": "string"}},
+    "error": {"type": "string"}
+  }
+}

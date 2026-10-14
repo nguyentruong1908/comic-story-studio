@@ -10,7 +10,7 @@ Apply this contract to every genre. Fantasy needs institutional and power-stage 
 
 ## Research method
 
-Prefer Codex web search/open/read for discovery and source text. Do not launch browser MCP for ordinary research. Use browser interaction only when indispensable visual evidence is unavailable from web tools; record that limitation and the actual tool used. Never use browser automation to disguise an inaccessible source as inspected.
+Prefer the agent's own web search/fetch tools (Codex web search/open, Claude Code WebSearch/WebFetch) for discovery and source text. Do not launch browser MCP for ordinary research. Use browser interaction only when indispensable visual evidence is unavailable from web tools; record that limitation and the actual tool used. Never use browser automation to disguise an inaccessible source as inspected.
 
 Start with a question matrix for **world**, **roles/costume**, **architecture/environment**, **props/materials**, and **visual language**. Make questions concrete: what distinguishes worker from elder, a service dormitory from a ceremonial court, this era from a generic costume, and a village from an institution? Inspect the story's stage, rank, season, region, time of day and scene function before choosing cues.
 

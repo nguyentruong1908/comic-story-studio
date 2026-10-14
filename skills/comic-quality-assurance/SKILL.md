@@ -7,6 +7,8 @@ description: Use when reviewing original comic images for source fidelity, ident
 
 Follow the [shared contract](../../references/production-contract.md) and [QA evidence schema](../../references/qa-gates.md). Consult [paragraph completeness](../../references/paragraph-completeness.md) and [action/expression](../../references/action-expression.md) for source/performance evidence.
 
+Plugin root for commands: `${CLAUDE_PLUGIN_ROOT}` (Claude Code) or the folder two levels above this file; written as `<plugin>` below.
+
 A different reviewer inspects every final original page and applicable references at native resolution. One pass/report records identity, distinctiveness, asset/state, source-unit coverage, acting, world/style, lettering/tails and transitions. Reuse the actual original and already-viewed reference inspection within that review; avoid HTML staging, browser actions and separate full-gallery passes per domain.
 
 Read once for visual story and once for lettering. Check all carriers, speakers, claims/uncertainty, source-sensitive treatment, causal direction/contact, expression/body agreement and actual glyph legibility/spacing in the original. Examine scene boundaries in the complete chapter read. Record concrete observations with current hashes, reviewer, actual method/time and limits; copying planned expected values is invalid.
