@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Synthetic metadata/text-byte fixtures ONLY. No actual artwork, image_gen call,
-// Internet inspection, browser screenshot or pixel approval is represented.
+// Internet inspection, native image inspection or pixel approval is represented.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,18 +18,18 @@ function setup(root, {direct = false, large = false, supplement = false} = {}) {
   const put = (file, bytes) => {fs.writeFileSync(path.join(root, file), bytes); return sha(bytes);};
   const hashFile = file => sha(fs.readFileSync(path.resolve(root, file)));
   const ids = direct ? ['A','B'] : ['A','B','C','D','E','F'];
-  put('source.txt', 'Synthetic source text'); put('mobile.jpg', 'Synthetic non-image screenshot bytes');
+  put('source.txt', 'Synthetic source text');
   for (const id of ids) put(`${id}.png`, `Synthetic non-image individual reference ${id}`);
   const dossier = {schema:'comic-research-v1',status:'approved',project_id:'synthetic-chain',scope:'Synthetic stage',created_at:time,updated_at:time,
     canonical_sources:[{path:'source.txt',sha256:hashFile('source.txt')}],
     sources:[{source_id:'S',title:'Synthetic fixture evidence',url:'https://example.com/synthetic',kind:'authoritative_reference',accessed_at:time,access_status:'inspected',inspection:'text',locator:'Synthetic locator',evidence_summary:'No real inspection; fixture only'}],
     questions:['world','roles_costume','architecture_environment','props_materials','visual_language'].map(domain=>({question_id:domain,domain,question:'Synthetic question',conclusion:'Synthetic answer',source_ids:['S']})),
     claims:[{claim_id:'D',classification:'design_choice',statement:'Synthetic bounded construction',source_ids:['S'],scope:'Synthetic scope',confidence:'medium',rationale:'Explicit synthetic design choice'}],conflicts:[],gaps:[],
-    art_direction:{medium:'Synthetic comic',linework:'Synthetic contours',anatomy:'Synthetic anatomy',palette_lighting:'Synthetic light',detail_budget:'Synthetic hierarchy',mobile_readability:'Synthetic390 metadata'},
+    art_direction:{medium:'Synthetic comic',linework:'Synthetic contours',anatomy:'Synthetic anatomy',palette_lighting:'Synthetic light',detail_budget:'Synthetic hierarchy',readability:'Synthetic readability metadata'},
     entities:ids.map(id=>({entity_id:id,entity_type:'character',scope:'Synthetic stage',role:'Synthetic role',claim_ids:['D'],design_brief:{silhouette:'Synthetic shape',materials:'Synthetic cloth',palette:'Synthetic colour',construction:'Synthetic joints',context_cues:'Synthetic role',avoid:'Invented content'}})),
     review:{status:'PASS',reviewer:'Synthetic fixture reviewer',checked_at:time,criteria:criteria(['evidence_quality','canon_separation','scope_coverage','visual_specificity'])}};
   write('research.json',dossier);
-  const design={schema:'comic-world-design-review-v1',status:'approved',dossier_sha256:hashFile('research.json'),reviewer:'Synthetic fixture reviewer',checked_at:time,entities:ids.map(id=>({entity_id:id,reference_file:`${id}.png`,reference_sha256:hashFile(`${id}.png`),mobile_screenshot_path:'mobile.jpg',criteria:criteria(['context_fit','construction_materials','visual_hierarchy','mobile_readability'])}))};
+  const design={schema:'comic-world-design-review-v1',status:'approved',dossier_sha256:hashFile('research.json'),reviewer:'Synthetic fixture reviewer',checked_at:time,entities:ids.map(id=>({entity_id:id,reference_file:`${id}.png`,reference_sha256:hashFile(`${id}.png`),full_size_checked:true,method:'Synthetic native reference inspection record',native_image_path:`${id}.png`,native_image_sha256:hashFile(`${id}.png`),criteria:criteria(['context_fit','construction_materials','visual_hierarchy'])}))};
   write('design.json',design);
   const context={enabled:true,dossier_file:'research.json',dossier_sha256:hashFile('research.json'),design_review_file:'design.json',design_review_sha256:hashFile('design.json')};
   const blocks = ['P1 source/role/material application '+(large?'x'.repeat(16000):'first'), 'P2 source/role/material application '+(large?'y'.repeat(16000):'second')];
@@ -44,7 +44,9 @@ function setup(root, {direct = false, large = false, supplement = false} = {}) {
     chain.push({arguments_file:`args${i}.json`,arguments_sha256:hashFile(`args${i}.json`),context_snapshot:structuredClone(context),tool_call_id:`synthetic-call-${i}`,original_output_path:path.join(root,`stage${i}.png`),original_sha256:hashFile(`stage${i}.png`),input_reference_hashes:Object.fromEntries(args.referenced_image_paths.map(f=>[f,hashFile(f)])),predecessor_output_path:i===0?null:path.join(root,`stage${i-1}.png`),predecessor_output_sha256:i===0?null:hashFile(`stage${i-1}.png`)});
   }
   const last=chain.at(-1);fs.copyFileSync(last.original_output_path,path.join(root,'page.png'));
-  const page={page:1,image_path:'page.png',asset_hash:hashFile('page.png'),panels:structuredClone(panels),imagegen_provenance:{tool_call_id:last.tool_call_id,original_output_path:last.original_output_path,original_sha256:last.original_sha256},world_style_review:{status:'PASS',reviewer:'Synthetic fixture reviewer',checked_at:time,asset_hash:hashFile('page.png'),dossier_sha256:context.dossier_sha256,design_review_sha256:context.design_review_sha256,mobile_screenshot_path:'mobile.jpg',panels:panels.map(p=>({panel_id:p.panel_id,status:'PASS',observations:'Synthetic schema observation only'}))},research_render_evidence:{reviewer:'Synthetic fixture reviewer',checked_at:time,context_snapshot:structuredClone(context),tool_call_id:last.tool_call_id,arguments_file:last.arguments_file,arguments_sha256:last.arguments_sha256,...(!direct?{invocation_chain:chain}:{})}};
+  // Reviews inspect the genuine image_gen original, which the delivered page copies byte for byte.
+  const native=()=>({full_size_checked:true,method:'Synthetic native original inspection record',native_image_path:last.original_output_path,native_image_sha256:hashFile('page.png')});
+  const page={page:1,image_path:'page.png',asset_hash:hashFile('page.png'),panels:structuredClone(panels),imagegen_provenance:{tool_call_id:last.tool_call_id,original_output_path:last.original_output_path,original_sha256:last.original_sha256},world_style_review:{status:'PASS',reviewer:'Synthetic fixture reviewer',checked_at:time,asset_hash:hashFile('page.png'),dossier_sha256:context.dossier_sha256,design_review_sha256:context.design_review_sha256,...native(),panels:panels.map(p=>({panel_id:p.panel_id,status:'PASS',observations:'Synthetic schema observation only'}))},research_render_evidence:{reviewer:'Synthetic fixture reviewer',checked_at:time,context_snapshot:structuredClone(context),tool_call_id:last.tool_call_id,arguments_file:last.arguments_file,arguments_sha256:last.arguments_sha256,...(!direct?{invocation_chain:chain}:{})}};
   const manifest={research_context:structuredClone(context),pages:[page]};
   const editArgs=(i,fn)=>{const s=chain[i];const a=JSON.parse(fs.readFileSync(path.resolve(root,s.arguments_file)));fn(a);write(s.arguments_file,a);s.arguments_sha256=hashFile(s.arguments_file);s.input_reference_hashes=Object.fromEntries((a.referenced_image_paths||[]).map(f=>[f,hashFile(f)]));if(i===chain.length-1) page.research_render_evidence.arguments_sha256=s.arguments_sha256;};
   const read = file => JSON.parse(fs.readFileSync(path.resolve(root,file)));
@@ -71,7 +73,7 @@ function setup(root, {direct = false, large = false, supplement = false} = {}) {
     for(const id of ['PROP_EXTRA','PROP_UNUSED','EXTRA_PERSON'])put(`${id}.png`,`Synthetic non-image ${id}`);
     for(const id of ['PROP_EXTRA','PROP_UNUSED','EXTRA_PERSON']){
       dossier.entities.push({...structuredClone(dossier.entities[0]),entity_id:id,entity_type:id==='EXTRA_PERSON'?'character':'asset'});
-      design.entities.push({...structuredClone(design.entities[0]),entity_id:id,status:'PASS',reference_file:`${id}.png`,reference_sha256:hashFile(`${id}.png`),full_size_pixels_checked:true,mobile_pixels_checked:true,mobile_screenshot_sha256:hashFile('mobile.jpg'),mobile_geometry:{viewport:{width:390}}});
+      design.entities.push({...structuredClone(design.entities[0]),entity_id:id,status:'PASS',reference_file:`${id}.png`,reference_sha256:hashFile(`${id}.png`),native_image_path:`${id}.png`,native_image_sha256:hashFile(`${id}.png`)});
     }
     write('research.json',dossier);syncContext();
     registry={schema:'comic-asset-registry-v1',assets:['PROP_EXTRA','PROP_UNUSED'].map(id=>({asset_id:id,status:'approved',reference_file:`${id}.png`,sha256:hashFile(`${id}.png`)}))};
@@ -81,10 +83,10 @@ function setup(root, {direct = false, large = false, supplement = false} = {}) {
     const observed=page.panels[0];observed.asset_ids=['PROP_EXTRA'];observed.asset_reference_files=['PROP_EXTRA.png'];observed.observed_asset_ids=['PROP_EXTRA'];
     observed.asset_states={PROP_EXTRA:{state:'Synthetic visible extra prop',reviewer:'Independent fixture reviewer',asset_hash:page.asset_hash}};
     observed.asset_visibility_supplements=[{asset_id:'PROP_EXTRA',reference_sha256:hashFile('PROP_EXTRA.png'),reviewer:'Independent fixture reviewer'}];
-    page.asset_review={status:'internal_pass',reviewer:'Independent fixture reviewer',checked_at:time,method:'Synthetic native and390 observations only',asset_hash:page.asset_hash,reference_hashes:{PROP_EXTRA:hashFile('PROP_EXTRA.png')},panels_checked:['P1']};
+    page.asset_review={status:'internal_pass',reviewer:'Independent fixture reviewer',checked_at:time,method:'Synthetic native observations only',asset_hash:page.asset_hash,reference_hashes:{PROP_EXTRA:hashFile('PROP_EXTRA.png')},panels_checked:['P1']};
     page.independent_qa_evidence={reviewer:'Independent fixture reviewer',reviewed_at:time,findings:[]};
-    page.source_unit_review={status:'PASS',reviewer:'Independent fixture reviewer',checked_at:time,asset_hash:page.asset_hash,full_size_checked:true,mobile_checked:true};
-    page.performance_review={status:'PASS',reviewer:'Independent fixture reviewer',checked_at:time,asset_hash:page.asset_hash,mobile_width_px:390,screenshot_path:'mobile.jpg'};
+    page.source_unit_review={status:'PASS',reviewer:'Independent fixture reviewer',checked_at:time,asset_hash:page.asset_hash,...native()};
+    page.performance_review={status:'PASS',reviewer:'Independent fixture reviewer',checked_at:time,asset_hash:page.asset_hash,...native()};
     page.world_style_review.reviewer='Independent fixture reviewer';page.world_style_review.panels[0].claim_ids=['D'];
     editArgs(chain.length-1,a=>a.referenced_image_paths.push(path.join(root,'PROP_EXTRA.png')));
     if(direct)page.research_render_evidence.input_reference_hashes=structuredClone(chain[0].input_reference_hashes);
@@ -179,12 +181,13 @@ supplementTest('supplement requires independent reference comparison hash',x=>de
 supplementTest('supplement requires its panel in the asset review',x=>x.page.asset_review.panels_checked=[]);
 supplementTest('supplement requires native page review evidence',x=>x.page.source_unit_review.full_size_checked=false);
 supplementTest('supplement requires an actual native review timestamp',x=>delete x.page.source_unit_review.checked_at);
-supplementTest('supplement requires mobile page review evidence',x=>x.page.source_unit_review.mobile_checked=false);
-supplementTest('supplement requires actual390 page evidence',x=>x.page.performance_review.mobile_width_px=320);
-supplementTest('supplement requires an actual mobile review timestamp',x=>delete x.page.performance_review.checked_at);
+supplementTest('supplement requires the native original in page review',x=>x.page.source_unit_review.native_image_path='page.png');
+supplementTest('supplement requires native performance review evidence',x=>x.page.performance_review.full_size_checked=false);
+supplementTest('supplement rejects a stale native performance hash',x=>x.page.performance_review.native_image_sha256='0'.repeat(64));
+supplementTest('supplement requires an actual performance review timestamp',x=>delete x.page.performance_review.checked_at);
 supplementTest('supplement rejects a failed individual design review',x=>{x.design.entities.find(e=>e.entity_id==='PROP_EXTRA').status='FAIL';x.syncContext();});
-supplementTest('supplement requires native reference review',x=>{x.design.entities.find(e=>e.entity_id==='PROP_EXTRA').full_size_pixels_checked=false;x.syncContext();});
-supplementTest('supplement requires current390 reference screenshot hash',x=>{x.design.entities.find(e=>e.entity_id==='PROP_EXTRA').mobile_screenshot_sha256='f'.repeat(64);x.syncContext();});
+supplementTest('supplement requires native reference review',x=>{x.design.entities.find(e=>e.entity_id==='PROP_EXTRA').full_size_checked=false;x.syncContext();});
+supplementTest('supplement requires current native reference hash',x=>{x.design.entities.find(e=>e.entity_id==='PROP_EXTRA').native_image_sha256='f'.repeat(64);x.syncContext();});
 supplementTest('supplement requires the relevant world claim on observed panel',x=>x.page.world_style_review.panels[0].claim_ids=[]);
 supplementTest('supplement cannot be a metadata hash without an actual input',x=>x.editArgs(2,a=>a.referenced_image_paths=a.referenced_image_paths.filter(f=>!f.endsWith('/PROP_EXTRA.png'))));
 supplementTest('supplement still requires actual call identifier',x=>delete x.chain[2].tool_call_id);

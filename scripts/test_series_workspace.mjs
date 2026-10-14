@@ -24,6 +24,9 @@ try {
   assert.equal(config.active_chapter, null);
   assert.equal(config.resources.world_research.availability, 'planned');
   assert.ok(!fs.existsSync(path.join(dir, 'research/world-style.json')));
+  assert.equal(config.directories.packages, 'packages');
+  assert.ok(fs.statSync(path.join(dir, 'packages')).isDirectory());
+  assert.ok(!('reader' in config) && !('reader_root' in initialized) && !('publish_root' in initialized));
   assert.ok(!/status:\s*approved/.test(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8')));
   cases++;
   fail(run('init', root, 'space-comic'), /already exists/);
@@ -108,7 +111,8 @@ try {
   config.resources.source_01.availability = 'planned'; delete config.resources.source_01.sha256; write(index, config);
   fail(run('check', index), /planned.*exists/i);
   config.resources.source_01.availability = 'present'; config.resources.source_01.sha256 = hash(source);
-  config.reader.publish_root = '../another-series/production'; write(index, config);
-  fail(run('check', index), /publish.*reader/i);
+  write(index, config); pass(run('check', index), 'restored resource passes');
+  delete config.directories.packages; write(index, config);
+  fail(run('check', index), /series-relative path/i);
   console.log(`Series workspace tests passed: ${cases} cases (real filesystem + CLI).`);
 } finally { fs.rmSync(root, {recursive:true,force:true}); }

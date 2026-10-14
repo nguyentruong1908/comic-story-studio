@@ -4,13 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'comic-crowd-test-'));
-const profile={class:'candidate',forbidden_principal_signals:['VL_C1.face','VL_C1.hair','VL_C1.silhouette'],variation_axes:['face_shape','hair_shape','body_build','pose','scale','focus','contrast']};
-const basePanel={panel_id:'P1',character_ids:['VL_C1','CANDIDATE_CROWD'],reference_files:['refs/VL_C1.png'],speaker_mapping:{},crowd_rendering:{mode:'deemphasized',crowd_ids:['CANDIDATE_CROWD'],profile_ids:['CANDIDATE_CROWD'],foreground_priority:['VL_C1'],reference_files:[],observed_crowd_ids:['CANDIDATE_CROWD'],depth:'background',focus:'soft',contrast:'low',foreground_face_policy:'back_or_side_or_occluded',variation_axes:['face_shape','hair_shape','body_build','pose','scale','focus','contrast'],exclusion_locks:{CANDIDATE_CROWD:['VL_C1.face','VL_C1.hair','VL_C1.silhouette']}},crowd_visual_separation:{status:'PASS',compared_against:['VL_C1'],observed_axes:['face_shape','hair_shape','silhouette','contrast'],evidence:'thumbnail and mobile review: crowd faces varied and remain soft/background.'}};
-const bad={schema:'comic-production-manifest-v2',status:'needs_revision',non_reference_character_ids:['CANDIDATE_CROWD'],pages:[{page:1,panels:[{panel_id:'P1',character_ids:['VL_C1','CANDIDATE_CROWD'],reference_files:['refs/VL_C1.png'],speaker_mapping:{}}]}]};
+const profile={class:'candidate',forbidden_principal_signals:['HERO_A.face','HERO_A.hair','HERO_A.silhouette'],variation_axes:['face_shape','hair_shape','body_build','pose','scale','focus','contrast']};
+const basePanel={panel_id:'P1',character_ids:['HERO_A','CANDIDATE_CROWD'],reference_files:['refs/HERO_A.png'],speaker_mapping:{},crowd_rendering:{mode:'deemphasized',crowd_ids:['CANDIDATE_CROWD'],profile_ids:['CANDIDATE_CROWD'],foreground_priority:['HERO_A'],reference_files:[],observed_crowd_ids:['CANDIDATE_CROWD'],depth:'background',focus:'soft',contrast:'low',foreground_face_policy:'back_or_side_or_occluded',variation_axes:['face_shape','hair_shape','body_build','pose','scale','focus','contrast'],exclusion_locks:{CANDIDATE_CROWD:['HERO_A.face','HERO_A.hair','HERO_A.silhouette']}},crowd_visual_separation:{status:'PASS',compared_against:['HERO_A'],observed_axes:['face_shape','hair_shape','silhouette','contrast'],evidence:'thumbnail and mobile review: crowd faces varied and remain soft/background.'}};
+const bad={schema:'comic-production-manifest-v2',status:'needs_revision',non_reference_character_ids:['CANDIDATE_CROWD'],pages:[{page:1,panels:[{panel_id:'P1',character_ids:['HERO_A','CANDIDATE_CROWD'],reference_files:['refs/HERO_A.png'],speaker_mapping:{}}]}]};
 const good={schema:'comic-production-manifest-v2',status:'needs_revision',non_reference_character_ids:['CANDIDATE_CROWD'],crowd_rendering_policy:{mode:'deemphasized',forbidden:['reuse-principal-reference','hero-face-clone','same-scale-same-focus-clone']},crowd_profiles:{CANDIDATE_CROWD:profile},pages:[{page:1,panels:[basePanel]}]};
 for(const [name,data] of [['bad.json',bad],['good.json',good]]) fs.writeFileSync(path.join(dir,name),JSON.stringify(data));
-const validator=path.resolve('codex-plugins/comic-story-studio/scripts/validate_crowd_separation.mjs');
+const validator=path.join(here, 'validate_crowd_separation.mjs');
 const badRun=spawnSync(process.execPath,[validator,dir,path.join(dir,'bad.json')],{encoding:'utf8'});if(badRun.status===0) throw new Error('bad fixture unexpectedly passed');
 const goodRun=spawnSync(process.execPath,[validator,dir,path.join(dir,'good.json')],{encoding:'utf8'});if(goodRun.status!==0) throw new Error(`good fixture failed: ${goodRun.stderr||goodRun.stdout}`);
 const design=structuredClone(good);
@@ -31,7 +33,7 @@ const malformed=[
   ['forbidden clone',m=>m.crowd_rendering_policy.forbidden=[]],
   ['profiles',m=>delete m.crowd_profiles],
   ['inferred ID',m=>m.pages[0].panels[0].crowd_rendering.crowd_ids=['WRONG']],
-  ['cast',m=>m.pages[0].panels[0].character_ids=['VL_C1']],
+  ['cast',m=>m.pages[0].panels[0].character_ids=['HERO_A']],
   ['reference',m=>m.pages[0].panels[0].crowd_rendering.reference_files=['refs/CANDIDATE_CROWD.png']],
   ['versioned reference',m=>m.pages[0].panels[0].reference_files.push('refs/CANDIDATE_CROWD-v2.png')],
   ['crowd speaker',m=>m.pages[0].panels[0].speaker_mapping.CANDIDATE_CROWD=['B01']],

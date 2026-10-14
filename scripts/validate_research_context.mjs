@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {validateQaScope, validateNativeInspection, pageOriginalPath} from './qa_scope.mjs';
+import {validateNativeInspection, pageOriginalPath} from './qa_evidence.mjs';
 import {fileURLToPath} from 'node:url';
 
 const nonempty = v => typeof v === 'string' && v.trim().length > 0;
@@ -11,10 +11,10 @@ const list = v => Array.isArray(v) ? v : [];
 const hash = b => crypto.createHash('sha256').update(b).digest('hex');
 const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
 const dated = v => nonempty(v) && Number.isFinite(Date.parse(v));
-export const researchStyleBlock = dossier => 'RESEARCH ART DIRECTION\n' + ['medium','linework','anatomy','palette_lighting','detail_budget','mobile_readability'].map(k=>`${k}: ${dossier.art_direction?.[k] || ''}`).join('\n');
+export const researchStyleBlock = dossier => 'RESEARCH ART DIRECTION\n' + ['medium','linework','anatomy','palette_lighting','detail_budget','readability'].map(k=>`${k}: ${dossier.art_direction?.[k] || ''}`).join('\n');
 
-export function validateResearchContext(root, input, manifest, mode = 'final', {artOnly = false} = {}) {
-  const errors = validateQaScope(manifest || input, artOnly);
+export function validateResearchContext(root, input, manifest, mode = 'final') {
+  const errors = [];
   const check = (ok, message) => { if (!ok) errors.push(message); };
   const load = file => {
     try { return JSON.parse(fs.readFileSync(path.resolve(root, file), 'utf8')); }
@@ -94,7 +94,7 @@ export function validateResearchContext(root, input, manifest, mode = 'final', {
       check(nonempty(item.resolution || item.reason), `${field}: decision/gap rationale required`);
     }
   }
-  for (const key of ['medium','linework','anatomy','palette_lighting','detail_budget','mobile_readability']) check(nonempty(dossier.art_direction?.[key]), `Art direction missing ${key}`);
+  for (const key of ['medium','linework','anatomy','palette_lighting','detail_budget','readability']) check(nonempty(dossier.art_direction?.[key]), `Art direction missing ${key}`);
   const entities = indexed(dossier.entities, 'entity_id', 'Research entity');
   check(entities.size > 0, 'Scoped entity design briefs required');
   for (const e of entities.values()) {
@@ -117,17 +117,8 @@ export function validateResearchContext(root, input, manifest, mode = 'final', {
   for (const e of designed.values()) {
     check(entities.has(e.entity_id) && entities.get(e.entity_id).entity_type !== 'crowd', `Design ${e.entity_id}: unknown/crowd reference`);
     check(nonempty(e.reference_file) && digest(e.reference_file) === e.reference_sha256, `Design ${e.entity_id}: stale reference bytes`);
-    if (artOnly) {
-      // Existing full-size reference inspections record the same original path
-      // and hash as reference_file/reference_sha256 plus inspection_tool. Read
-      // those authentic aliases without modifying the frozen design record.
-      const legacyMethod = nonempty(e.inspection_tool) ? e.inspection_tool : e.actual_visual_review_method;
-      const legacyNative = nonempty(legacyMethod) && !Object.hasOwn(e, 'method') && !Object.hasOwn(e, 'native_image_path') && !Object.hasOwn(e, 'native_image_sha256');
-      const native = legacyNative ? {...e, full_size_checked:Object.hasOwn(e, 'full_size_checked') ? e.full_size_checked : e.full_size_pixels_checked, native_image_path:e.reference_file, native_image_sha256:e.reference_sha256, method:legacyMethod} : e;
-      errors.push(...validateNativeInspection(root, e.reference_file, e.reference_sha256, native, `Design ${e.entity_id}`));
-    }
-    else check(nonempty(e.mobile_screenshot_path) && digest(e.mobile_screenshot_path) !== null, `Design ${e.entity_id}: actual mobile screenshot required`);
-    for (const key of ['context_fit','construction_materials','visual_hierarchy', ...(artOnly ? [] : ['mobile_readability'])]) check(e.criteria?.[key]?.status === 'PASS' && nonempty(e.criteria?.[key]?.observations), `Design ${e.entity_id}: missing ${key} observations`);
+    errors.push(...validateNativeInspection(root, e.reference_file, e.reference_sha256, e, `Design ${e.entity_id}`));
+    for (const key of ['context_fit','construction_materials','visual_hierarchy']) check(e.criteria?.[key]?.status === 'PASS' && nonempty(e.criteria?.[key]?.observations), `Design ${e.entity_id}: missing ${key} observations`);
   }
   const pages = indexed(input.pages, 'page', 'Storyboard page');
   check(pages.size > 0, 'Storyboard pages required');
@@ -173,8 +164,7 @@ export function validateResearchContext(root, input, manifest, mode = 'final', {
     review(r, `Page ${page.page} world style`);
     check(r?.asset_hash === imageHash && r?.dossier_sha256 === context.dossier_sha256, `Page ${page.page}: stale world-style observations`);
     check(r?.design_review_sha256 === context.design_review_sha256, `Page ${page.page}: style review bound to different design references`);
-    if (artOnly) errors.push(...validateNativeInspection(root, pageOriginalPath(page), imageHash, r, `Page ${page.page} world style`));
-    else check(nonempty(r?.mobile_screenshot_path) && digest(r.mobile_screenshot_path) !== null, `Page ${page.page}: mobile world-style evidence missing`);
+    errors.push(...validateNativeInspection(root, pageOriginalPath(page), imageHash, r, `Page ${page.page} world style`));
     const obs = indexed(r?.panels, 'panel_id', `Page ${page.page} world review`);
     const finalPanels = indexed(page.panels, 'panel_id', `Page ${page.page} delivered panel`);
     const ids = list(expected.panels).map(p=>p.panel_id).sort();
@@ -207,15 +197,11 @@ export function validateResearchContext(root, input, manifest, mode = 'final', {
       const reviewer = ar?.reviewer;
       check(['internal_pass','user_approved'].includes(ar?.status) && ar?.asset_hash === imageHash && nonempty(ar?.method) && dated(ar?.checked_at), `${label}: current asset review required`);
       check(nonempty(reviewer) && reviewer === independent?.reviewer && dated(independent?.reviewed_at) && reviewer !== render?.reviewer, `${label}: independent reviewer required`);
-      const native = page.source_unit_review, mobile = page.performance_review;
-      check(native?.status === 'PASS' && native.asset_hash === imageHash && native.reviewer === reviewer && dated(native.checked_at) && native.full_size_checked === true && (artOnly || native.mobile_checked === true), `${label}: current native/mobile page review required`);
-      if (artOnly) {
-        errors.push(...validateNativeInspection(root, pageOriginalPath(page), imageHash, native, `${label} source`));
-        errors.push(...validateNativeInspection(root, pageOriginalPath(page), imageHash, mobile, `${label} performance`));
-        check(mobile?.status === 'PASS' && mobile.asset_hash === imageHash && mobile.reviewer === reviewer && dated(mobile.checked_at) && r.reviewer === reviewer, `${label}: independent native performance review required`);
-      } else {
-        check(mobile?.status === 'PASS' && mobile.asset_hash === imageHash && mobile.reviewer === reviewer && dated(mobile.checked_at) && mobile.mobile_width_px === 390 && nonempty(mobile.screenshot_path) && digest(mobile.screenshot_path) !== null && nonempty(r?.mobile_screenshot_path) && path.resolve(root, mobile.screenshot_path) === path.resolve(root, r.mobile_screenshot_path) && r.reviewer === reviewer, `${label}: actual390 page evidence required`);
-      }
+      const native = page.source_unit_review, performance = page.performance_review;
+      check(native?.status === 'PASS' && native.asset_hash === imageHash && native.reviewer === reviewer && dated(native.checked_at) && native.full_size_checked === true, `${label}: current native page review required`);
+      errors.push(...validateNativeInspection(root, pageOriginalPath(page), imageHash, native, `${label} source`));
+      errors.push(...validateNativeInspection(root, pageOriginalPath(page), imageHash, performance, `${label} performance`));
+      check(performance?.status === 'PASS' && performance.asset_hash === imageHash && performance.reviewer === reviewer && dated(performance.checked_at) && r.reviewer === reviewer, `${label}: independent native performance review required`);
       const headerValid = errors.length;
       for (const panel of list(page.panels)) {
         const seen = new Set();
@@ -233,12 +219,8 @@ export function validateResearchContext(root, input, manifest, mode = 'final', {
           check(ref && digest(ref) === asset?.sha256 && approved?.reference_sha256 === asset?.sha256 && nonempty(approved?.reference_file) && path.resolve(root, approved.reference_file) === ref && list(panel.asset_reference_files).some(f => nonempty(f) && path.resolve(root,f) === ref), `${tag}: exact approved reference path/hash required`);
           check(supplement?.reference_sha256 === asset?.sha256 && supplement?.reviewer === reviewer && state?.reviewer === reviewer && state?.asset_hash === imageHash && nonempty(state?.state), `${tag}: current independent observed state required`);
           check(ar?.reference_hashes?.[id] === asset?.sha256 && list(ar?.panels_checked).includes(panel.panel_id), `${tag}: independent reference comparison required`);
-          if (artOnly) {
-            check(approved?.status === 'PASS' && approved?.full_size_pixels_checked === true, `${tag}: native approved reference evidence required`);
-            errors.push(...validateNativeInspection(root, ref, asset?.sha256, approved, tag));
-          } else {
-            check(approved?.status === 'PASS' && approved?.full_size_pixels_checked === true && approved?.mobile_pixels_checked === true && approved?.mobile_geometry?.viewport?.width === 390 && nonempty(approved?.mobile_screenshot_sha256) && digest(approved.mobile_screenshot_path) === approved.mobile_screenshot_sha256, `${tag}: native/390 approved reference evidence required`);
-          }
+          check(approved?.status === 'PASS', `${tag}: approved reference review required`);
+          errors.push(...validateNativeInspection(root, ref, asset?.sha256, approved, tag));
           check(list(entity?.claim_ids).some(c => list(obs.get(panel.panel_id)?.claim_ids).includes(c)), `${tag}: observed world claim required`);
           // Header errors must not accidentally grant a path to any supplement.
           if (before === errors.length && headerValid === 0) supplementalRefs.set(ref, asset.sha256);
@@ -334,13 +316,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const flags = new Set(process.argv.slice(2).filter(x=>x.startsWith('--')));
   const [rootArg,inputArg,manifestArg] = process.argv.slice(2).filter(x=>!x.startsWith('--'));
   const mode = flags.has('--research-only') ? 'research' : flags.has('--design-only') ? 'design' : 'final';
-  if ([...flags].some(x=>!['--research-only','--design-only','--art-only'].includes(x)) || (flags.has('--research-only') && flags.has('--design-only')) || !rootArg || !inputArg || (mode === 'final' && !manifestArg)) {
-    console.error('Usage: validate_research_context.mjs [--art-only] [--research-only|--design-only] <project-root> <dossier|storyboard.json> [manifest.json]'); process.exit(2);
+  if ([...flags].some(x=>!['--research-only','--design-only'].includes(x)) || (flags.has('--research-only') && flags.has('--design-only')) || !rootArg || !inputArg || (mode === 'final' && !manifestArg)) {
+    console.error('Usage: validate_research_context.mjs [--research-only|--design-only] <project-root> <dossier|storyboard.json> [manifest.json]'); process.exit(2);
   }
   try {
     const root = path.resolve(rootArg);
     const read = f => JSON.parse(fs.readFileSync(path.resolve(root,f),'utf8'));
-    const errors = validateResearchContext(root,read(inputArg),manifestArg ? read(manifestArg) : null,mode,{artOnly:flags.has('--art-only')});
+    const errors = validateResearchContext(root,read(inputArg),manifestArg ? read(manifestArg) : null,mode);
     if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
     console.log(`Research/world-style ${mode} gate PASS: records, current hashes and context coverage checked; source truth and pixel quality require actual review.`);
   } catch (e) { console.error(e.message); process.exit(1); }

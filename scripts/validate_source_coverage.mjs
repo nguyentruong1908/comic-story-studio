@@ -3,16 +3,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {validateQaScope, validateNativeInspection, pageOriginalPath} from './qa_scope.mjs';
+import {validateNativeInspection, pageOriginalPath} from './qa_evidence.mjs';
 import {isDeepStrictEqual} from 'node:util';
 
 const args = process.argv.slice(2);
 const designOnly = args.includes('--design-only');
-const artOnly = args.includes('--art-only');
-const required = args.includes('--require-enabled') || artOnly;
 const [rootArg, analysisArg, storyboardArg, manifestArg] = args.filter(arg => !arg.startsWith('--'));
 if (!rootArg || !analysisArg || !storyboardArg || (!designOnly && !manifestArg)) {
-  console.error('Usage: node validate_source_coverage.mjs [--art-only] [--design-only] [--require-enabled] <project-root> <analysis.json> <storyboard.json> [manifest.json]');
+  console.error('Usage: node validate_source_coverage.mjs [--design-only] <project-root> <analysis.json> <storyboard.json> [manifest.json]');
   process.exit(2);
 }
 const errors = [];
@@ -41,13 +39,8 @@ const checkTextRef = (ref, bubble, label) => {
 };
 const analyze = () => {
   const analysis = read(analysisArg), storyboard = read(storyboardArg);
-  if (artOnly) errors.push(...validateQaScope(manifestArg ? read(manifestArg) : storyboard, true));
   const contract = analysis.source_coverage_file ? read(analysis.source_coverage_file) : analysis.source_coverage;
-  if (contract?.mode !== 'paragraph-complete-v1') {
-    if (required || contract) fail('paragraph-complete-v1 source coverage contract is required');
-    else { console.log('Source coverage SKIP: historical contract absent; no exhaustive fidelity certified.'); return; }
-    return;
-  }
+  if (contract?.mode !== 'paragraph-complete-v1') { fail('paragraph-complete-v1 source coverage contract is required'); return; }
   if (!text(contract.source_path)) { fail('canonical source_path is required'); return; }
   const sourceBytes = fs.readFileSync(resolve(contract.source_path));
   const source = sourceBytes.toString('utf8');
@@ -56,7 +49,9 @@ const analyze = () => {
   if (!reviewHeader(contract.decomposition_review)) fail('decomposition review requires a real source comparison, reviewer, timestamp and concrete evidence');
   const mark = (coverage, start, end, label) => {
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > coverage.length) { fail(`${label}: invalid UTF-16 source range`); return false; }
-    for (let i = start; i < end; i++) { if (coverage[i]) fail(`${label}: overlap at offset ${i}`); coverage[i]++; }
+    const overlap = coverage.subarray(start, end).findIndex(Boolean);
+    if (overlap >= 0) fail(`${label}: overlap at offset ${start + overlap}`);
+    coverage.fill(1, start, end);
     return true;
   };
   const sourceCovered = new Uint8Array(source.length);
@@ -65,16 +60,7 @@ const analyze = () => {
     if (!mark(sourceCovered, exclusion.start, exclusion.end, 'source exclusion')) continue;
     const value = source.slice(exclusion.start, exclusion.end);
     if (hash(value) !== exclusion.sha256) fail('source exclusion hash mismatch');
-    if (exclusion.kind === 'website_footer') {
-      // Footer tokens must be literal website debris; a dialogue cannot be disguised as noise.
-      if (!/^(?:\s|[,.;:|/\-]|(?:truyen\s*full(?:vn|live)?|truyenfull\.vn|truyenfull\.live|vn|live|https?:\/\/truyenfull\.(?:vn|live)))+$/iu.test(value)) fail('website_footer exclusion contains story text or unrecognized noise');
-    } else if (exclusion.kind === 'website_header') {
-      if (exclusion.start !== source.search(/\S/u) || value.includes('\n') || !text(contract.source_title) || norm(value) !== norm(contract.source_title)) fail('website_header must be the exact declared source title at the beginning');
-    } else if (exclusion.kind === 'source_provenance_metadata') {
-      // Only the capture header immediately after the title; never narrative or dialogue.
-      const exactCaptureHeader = /^Nguồn: https:\/\/truyenfull\.(?:vn|live)\/[a-z0-9-]+\/chuong-\d+\/\r?\nNgày chụp nguồn: \d{4}-\d{2}-\d{2} \(Asia\/Ho_Chi_Minh\)$/u;
-      if (!exactCaptureHeader.test(value) || !text(contract.source_title) || source.slice(0, exclusion.start).trim() !== contract.source_title.trim()) fail('source_provenance_metadata must be the exact two-line capture header immediately after the declared title');
-    } else fail('source exclusion kind must be website_header, website_footer or source_provenance_metadata');
+    if (!['front_matter', 'back_matter'].includes(exclusion.kind) || !text(exclusion.reason)) fail('source exclusion needs kind front_matter or back_matter and a concrete reason');
   }
   const paragraphs = contract.paragraphs;
   if (!Array.isArray(paragraphs) || !paragraphs.length) { fail('source coverage paragraphs required'); return; }
@@ -131,6 +117,12 @@ const analyze = () => {
     }
   }
   for (let i = 0; i < source.length; i++) if (/\S/u.test(source[i]) && !sourceCovered[i]) { fail(`uncovered source content at offset ${i}`); break; }
+  // Exclusions may only trim capture debris around the story, never text inside it.
+  const storyStart = Math.min(...paragraphs.map(p => p.start)), storyEnd = Math.max(...paragraphs.map(p => p.end));
+  for (const exclusion of exclusions) {
+    if (exclusion.kind === 'front_matter' && !(exclusion.end <= storyStart)) fail('front_matter exclusion must end before the first story paragraph');
+    if (exclusion.kind === 'back_matter' && !(exclusion.start >= storyEnd)) fail('back_matter exclusion must start after the last story paragraph');
+  }
 
   const pages = storyboard.pages || [];
   const plans = new Map();
@@ -209,8 +201,8 @@ const analyze = () => {
       const matchingPages = (manifest.pages || []).filter(p => p.page === page.page);
       if (matchingPages.length !== 1) { fail(`page ${page.page}: exactly one final manifest page required`); continue; }
       const actual = matchingPages[0], review = actual.source_unit_review;
-      if (review?.status !== 'PASS' || !text(review.reviewer) || !Number.isFinite(Date.parse(review.reviewed_at)) || review.source_compared !== true || review.full_size_checked !== true || (!artOnly && review.mobile_checked !== true)) { fail(`page ${page.page}: actual source-unit review missing or incomplete`); continue; }
-      if (artOnly) errors.push(...validateNativeInspection(root, pageOriginalPath(actual), actual.asset_hash || review.asset_hash, review, `page ${page.page} source_unit_review`));
+      if (review?.status !== 'PASS' || !text(review.reviewer) || !Number.isFinite(Date.parse(review.reviewed_at)) || review.source_compared !== true || review.full_size_checked !== true) { fail(`page ${page.page}: actual source-unit review missing or incomplete`); continue; }
+      errors.push(...validateNativeInspection(root, pageOriginalPath(actual), actual.asset_hash || review.asset_hash, review, `page ${page.page} source_unit_review`));
       if (review.source_sha256 !== contract.source_sha256) fail(`page ${page.page}: stale source hash in source-unit review`);
       const assetHash = hash(fs.readFileSync(resolve(actual.image_path)));
       if (review.asset_hash !== assetHash || actual.asset_hash && actual.asset_hash !== assetHash) fail(`page ${page.page}: stale source-unit review asset hash`);

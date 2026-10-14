@@ -23,20 +23,20 @@ Do not invent a name, title, history, power level, relationship, or motivation. 
 
 ## Ordered fact contract
 
-When the source gives a character a name, the introduction must state the name before any other character fact. When the source gives a cultivation realm or level (for example Ngưng Khí, Trúc Cơ, or Kết Đan), it must appear immediately after the name and before the description. The final field is one short, source-backed description of the character's role, state, or action. Do not infer a name or realm from costume, genre convention, or an image. For an unknown fact, record an explicit status such as `not_stated_in_source`; never turn the absence of a fact into a fabricated label.
+When the source gives a character a name, the introduction must state the name before any other character fact. When the source gives the character a rank (a title, job, power level, team role or whatever standing the story uses), it must appear immediately after the name and before the description. The final field is one short, source-backed description of the character's role, state, or action. Do not infer a name or rank from costume, genre convention, or an image. For an unknown fact, record an explicit status such as `not_stated_in_source`; never turn the absence of a fact into a fabricated label.
 
 The v2 structured fields are:
 
 ```json
 {
   "identity": {"name": null, "name_status": "not_stated_in_source", "aliases": []},
-  "cultivation": {"level": null, "status": "not_stated_in_source", "source_paragraphs": []},
-  "description": {"text": "Nguồn chỉ cho biết vai trò hoặc trạng thái hiện tại.", "facts": ["role"]},
-  "field_order": ["identity", "cultivation", "description"]
+  "rank": {"level": null, "status": "not_stated_in_source", "source_paragraphs": []},
+  "description": {"text": "The source only states the current role or state.", "facts": ["role"]},
+  "field_order": ["identity", "rank", "description"]
 }
 ```
 
-Use `source_backed` plus a non-empty value when the source states a name or realm. The visible `text`/caption must follow the same order; the IDs, status fields, and source paragraph numbers stay in the manifest and never appear inside a speech balloon.
+Use `source_backed` plus a non-empty value when the source states a name or rank. The visible `text`/caption must follow the same order; the IDs, status fields, and source paragraph numbers stay in the manifest and never appear inside a speech balloon.
 
 ## Manifest shape
 
@@ -49,7 +49,7 @@ Enable the gate with `introduction_validation.mode: principal-first-appearance-v
     "source_faithful": true,
     "max_words": 25,
     "principal_character_ids": ["CHAR_A"],
-    "field_order": ["identity", "cultivation", "description"]
+    "field_order": ["identity", "rank", "description"]
   },
   "character_introductions": [{
     "character_id": "CHAR_A",
@@ -58,9 +58,9 @@ Enable the gate with `introduction_validation.mode: principal-first-appearance-v
     "source_paragraphs": [12, 13],
     "facts": ["role", "affiliation"],
     "identity": {"name": "...", "name_status": "source_backed", "aliases": []},
-    "cultivation": {"level": null, "status": "not_stated_in_source", "source_paragraphs": []},
+    "rank": {"level": null, "status": "not_stated_in_source", "source_paragraphs": []},
     "description": {"text": "...", "facts": ["role", "affiliation"]},
-    "field_order": ["identity", "cultivation", "description"],
+    "field_order": ["identity", "rank", "description"],
     "text": "Exact source-backed line.",
     "speaker": "CHAR_A",
     "status": "internal_pass",

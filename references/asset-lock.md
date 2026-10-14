@@ -9,21 +9,21 @@ The asset bible is the source of truth for recurring non-character visuals. It i
   "status": "approved-by-main-agent",
   "assets": [
     {
-      "asset_id": "PROP_BUNDLE_VL_C2",
-      "name": "Vương Lâm's travel bundle",
+      "asset_id": "PROP_SATCHEL",
+      "name": "Hero's travel satchel",
       "kind": "prop",
-      "reference_file": "tien-nghich/production/chapter-02/assets/PROP_BUNDLE_VL_C2.png",
+      "reference_file": "design/assets/PROP_SATCHEL.png",
       "sha256": "...",
       "recognition_signals": ["brown cloth wrap", "knotted top", "small rectangular silhouette"],
       "confusable_with": [],
-      "must_not_inherit": ["PROP_BOOKS_VL_C1"],
+      "must_not_inherit": ["PROP_BOOK_STACK"],
       "allowed_states": ["wrapped", "held against chest", "inside cart"]
     }
   ]
 }
 ```
 
-Each asset binds to an actual approved image and hash. A coherent location/component or character-costume reference may serve explicitly declared assets only after each component's full-size/mobile design and state review. Arbitrary collages, prompts without actual reference images and silent substitutions remain forbidden. Use a dedicated reference when independent identity, portability or closeup ambiguity requires it. Existing frozen bindings remain mandatory until reviewed adoption of a design change.
+Each asset binds to an actual approved image and hash. A coherent location/component or character-costume reference may serve explicitly declared assets only after each component's full-size design and state review. Arbitrary collages, prompts without actual reference images and silent substitutions remain forbidden. Use a dedicated reference when independent identity, portability or closeup ambiguity requires it. Existing frozen bindings remain mandatory until reviewed adoption of a design change.
 
 ## Manifest contract
 

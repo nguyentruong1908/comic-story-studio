@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {validateQaScope, validateNativeInspection, pageOriginalPath} from './qa_scope.mjs';
+import {validateNativeInspection, pageOriginalPath} from './qa_evidence.mjs';
 import {fileURLToPath} from 'node:url';
 
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -10,8 +10,8 @@ const text = value => typeof value === 'string' && value.trim().length > 0;
 const key = ids => [...ids].sort().join('|');
 const same = (a,b) => Array.isArray(a) && Array.isArray(b) && a.length === new Set(a).size && key(a) === key(b);
 // Checks evidence integrity and coverage, NOT facial recognition or truth of review.
-export function validateCharacterDistinctiveness(root, manifest, {referencesOnly = false, artOnly = false} = {}) {
-  const errors = validateQaScope(manifest, artOnly);
+export function validateCharacterDistinctiveness(root, manifest, {referencesOnly = false} = {}) {
+  const errors = [];
   const fail = message => errors.push(`character distinctiveness: ${message}`);
   let registry, registryPath;
   try {
@@ -41,16 +41,13 @@ export function validateCharacterDistinctiveness(root, manifest, {referencesOnly
   function review(r, label) {
     if (!r || r.status !== 'PASS') fail(`${label}: reviewed PASS required`);
     if (!text(r?.reviewer) || !text(r?.reviewed_at) || !Number.isFinite(Date.parse(r?.reviewed_at))) fail(`${label}: reviewer and ISO review time required`);
-    for (const mode of ['full_size', ...(artOnly ? [] : ['mobile']), 'face_only']) {
+    for (const mode of ['full_size', 'face_only']) {
       if (r?.checks?.[mode]?.status !== 'PASS' || !text(r?.checks?.[mode]?.evidence)) fail(`${label}: ${mode} PASS with observed evidence required`);
     }
   }
   const gate = registry.distinctiveness_review;
   review(gate, 'registry');
   function nativeReferences(r, checkedIds, label) {
-    // Existing complete reference reviews remain valid. Future art-only
-    // references substitute original pixel evidence for mobile proofs.
-    if (!artOnly || (r?.checks?.mobile?.status === 'PASS' && text(r.checks.mobile.evidence))) return;
     const rows = Array.isArray(r?.native_reference_images) ? r.native_reference_images : [];
     if (!same(rows.map(row => row.character_id), checkedIds)) fail(`${label}: exact native reference image coverage required`);
     for (const id of checkedIds) {
@@ -89,7 +86,7 @@ export function validateCharacterDistinctiveness(root, manifest, {referencesOnly
     for (const id of cast) if (!ids.includes(id)) fail(`${label}: unregistered cast ${id}`);
     const r = page.character_distinctiveness;
     review(r, label);
-    if (artOnly) errors.push(...validateNativeInspection(root, pageOriginalPath(page), page.asset_hash, r, label));
+    errors.push(...validateNativeInspection(root, pageOriginalPath(page), page.asset_hash, r, label));
     if (!same(r?.character_ids, cast)) fail(`${label}: review cast must match actual panel cast exactly`);
     try {
       const actual = hash(path.resolve(root, page.image_path));
@@ -105,12 +102,12 @@ export function validateCharacterDistinctiveness(root, manifest, {referencesOnly
   return errors;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2), referencesOnly = args.includes('--references-only'), artOnly = args.includes('--art-only');
-  const [rootArg, manifestArg] = args.filter(a => !['--references-only', '--art-only'].includes(a));
-  if (!rootArg || !manifestArg) { console.error('Usage: validate_character_distinctiveness.mjs [--art-only] <project-root> <manifest.json> [--references-only]'); process.exit(2); }
+  const args = process.argv.slice(2), referencesOnly = args.includes('--references-only');
+  const [rootArg, manifestArg] = args.filter(a => a !== '--references-only');
+  if (!rootArg || !manifestArg) { console.error('Usage: validate_character_distinctiveness.mjs <project-root> <manifest.json> [--references-only]'); process.exit(2); }
   try {
     const root = path.resolve(rootArg), manifest = JSON.parse(fs.readFileSync(path.resolve(root,manifestArg),'utf8'));
-    const errors = validateCharacterDistinctiveness(root, manifest, {referencesOnly, artOnly});
+    const errors = validateCharacterDistinctiveness(root, manifest, {referencesOnly});
     if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
     console.log('Character distinctiveness evidence gate PASS (not automated visual recognition).');
   } catch(e) { console.error(e.message); process.exit(1); }

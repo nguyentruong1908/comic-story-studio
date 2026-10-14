@@ -1,7 +1,7 @@
 {
   "name": "comic-story-studio",
-  "version": "0.2.0",
-  "description": "Research-first comic production with unified series folders, agent context and scoped handoffs, reviewed world design, image_gen, source fidelity, QA and publishing.",
+  "version": "0.3.0",
+  "description": "Research-first comic production: source analysis, world and character design, image_gen production, independent native QA and verified chapter packages.",
   "author": {
     "name": "Codex local workspace"
   },
@@ -25,7 +25,7 @@
     "parallel-agents",
     "production-plan",
     "quality-assurance",
-    "reader-publishing",
+    "chapter-packaging",
     "story-analysis",
     "storyboard",
     "webtoon",
@@ -37,7 +37,7 @@
   "interface": {
     "displayName": "Comic Story Studio",
     "shortDescription": "Research, design, produce and review faithful comics",
-    "longDescription": "A reusable research-first studio for every comic genre. Internet research distinguishes canonical facts, official adaptation observations, subject references and design choices before character or environment design. Scoped art direction is transferred into storyboards and actual image prompts, with current hash-bound design and page reviews alongside source, identity, action, lettering and imagegen provenance gates. Each series uses a resource index and explicit folder/root contract; persisted agent jobs freeze inputs and define write ownership, with mapped adoption for existing projects.",
+    "longDescription": "A reusable research-first studio for every comic genre. Internet research distinguishes canonical facts, official adaptation observations, subject references and design choices before character or environment design. Scoped art direction is transferred into storyboards and actual image prompts, with current hash-bound design and page reviews alongside source, identity, action, lettering and image_gen provenance gates. A single QA gate issues a receipt, and each finished chapter is packaged as an ordered, hash-verified set of the exact image_gen pages. Each series uses a resource index and explicit folder contract; persisted agent jobs freeze inputs and define write ownership.",
     "developerName": "Codex local workspace",
     "category": "Creativity",
     "capabilities": [
@@ -47,7 +47,7 @@
     "defaultPrompt": [
       "Set up a comic series workspace, then research its world, character roles, costumes and environments before design",
       "Design and produce source-faithful chapters using reviewed research, individual references and readable embedded lettering",
-      "Audit comic identity, world/style, source coverage and final pixels before publishing to a reader"
+      "Audit comic identity, world/style, source coverage and final pixels, then package the finished chapter"
     ],
     "brandColor": "#D97743",
     "composerIcon": "./assets/comic-story-studio.svg",

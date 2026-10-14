@@ -2,7 +2,7 @@
 
 Paragraph IDs prove where a panel came from; they do not prove that the panel preserved the story. Before storyboard approval, each beat must declare the source facts that cannot be summarized away.
 
-For every new or revised chapter, first satisfy [Exhaustive paragraph and dialogue fidelity](paragraph-completeness.md). Beat-level retention remains useful but cannot certify full coverage: it checks only the facts the author selected. The paragraph-complete contract anchors every source unit, preserves full conversations, requires detailed panel realization and checks fresh final-image observations. Choose page count after that decomposition passes.
+For every chapter, first satisfy [Exhaustive paragraph and dialogue fidelity](paragraph-completeness.md). Beat-level retention remains useful but cannot certify full coverage: it checks only the facts the author selected. The paragraph-complete contract anchors every source unit, preserves full conversations, requires detailed panel realization and checks fresh final-image observations. Choose page count after that decomposition passes.
 
 ## Beat retention record
 
@@ -11,13 +11,13 @@ Every beat in the analysis must include `source_density`, `must_retain`, and `ca
 ```json
 {
   "must_retain": [
-    {"id": "B03-05-F01", "source_paragraphs": [30], "kind": "dialogue", "speaker": "TAMSUHUYNH_C2", "text": "Tư chất kém chút...", "required": true},
-    {"id": "B03-05-F02", "source_paragraphs": [33, 34], "kind": "causal_fact", "text": "Hộp ngọc chứa linh chi 300 năm bị phong ấn.", "required": true}
+    {"id": "B03-05-F01", "source_paragraphs": [30], "kind": "dialogue", "speaker": "EXAMINER_A", "text": "<exact source line>", "required": true},
+    {"id": "B03-05-F02", "source_paragraphs": [33, 34], "kind": "causal_fact", "text": "<fact the next beat depends on>", "required": true}
   ],
   "causal_check": {
-    "trigger": "Kết quả tư chất kém",
-    "response": "Vương Hạo đưa hộp ngọc",
-    "consequence": "Giám khảo đổi ý và đề nghị làm dược đồng"
+    "trigger": "<what starts the beat>",
+    "response": "<who reacts and how>",
+    "consequence": "<what changes because of it>"
   }
 }
 ```

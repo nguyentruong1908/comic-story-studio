@@ -4,6 +4,8 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'comic-lettering-report-'));
 const reportPath = path.join(root, 'lettering.json');
@@ -31,14 +33,14 @@ const page = {
     balloon_edge_detected: true
   }]
 };
-page.visual_review = {asset_hash: page.asset_hash, reviewer: 'regression-fixture', checked_at: '2026-10-08T00:00:00Z', status: 'PASS', checks: Object.fromEntries(['text_accuracy','balloon_placement','face_hands_props_clear','speaker_tail','reading_order','mobile_readability'].map(key => [key, {status:'PASS', evidence:'Synthetic test fixture only; not a real visual review.'}]))};
+page.visual_review = {asset_hash: page.asset_hash, reviewer: 'regression-fixture', checked_at: '2026-10-08T00:00:00Z', status: 'PASS', full_size_checked: true, method: 'Synthetic native original inspection record', native_image_path: outputPath, native_image_sha256: page.asset_hash, checks: Object.fromEntries(['text_accuracy','balloon_placement','face_hands_props_clear','speaker_tail','reading_order'].map(key => [key, {status:'PASS', evidence:'Synthetic test fixture only; not a real visual review.'}]))};
 const report = {schema: 'comic-lettering-report-v1', status: 'PASS', pages: [page]};
 const manifest = {pages: [{page: 1, image_path: outputPath, asset_hash: page.asset_hash, panels: [{panel_id: 'P1', bubbles: [{speaker: 'CHAR_A', text: 'Xin chào'}]}]}]};
 const write = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 write(reportPath, report);
 write(manifestPath, manifest);
 
-const validator = path.resolve('codex-plugins/comic-story-studio/scripts/validate_lettering_report.mjs');
+const validator = path.join(here, 'validate_lettering_report.mjs');
 const good = spawnSync(process.execPath, [validator, root, reportPath, manifestPath, '--strict'], {encoding: 'utf8'});
 if (good.status !== 0) throw new Error(`GREEN fixture failed:\n${good.stdout}\n${good.stderr}`);
 
@@ -60,7 +62,7 @@ for (const [label, mutate] of [
  ['missing visual review', r=>{delete r.pages[0].visual_review;}],
  ['failed visual review', r=>{r.pages[0].visual_review.checks.face_hands_props_clear.status='FAIL';}],
  ['stale visual review', r=>{r.pages[0].visual_review.asset_hash='0'.repeat(64);}],
- ['missing visual evidence', r=>{r.pages[0].visual_review.checks.mobile_readability.evidence='';}],
+ ['missing visual evidence', r=>{r.pages[0].visual_review.checks.reading_order.evidence='';}],
  ['missing tail face check', r=>{delete r.pages[0].bubbles[0].tail_geometry.overlaps_face;}],
  ['stale hash', r=>{r.pages[0].asset_hash='0'.repeat(64);}],
  ['missing hash', r=>{delete r.pages[0].asset_hash;}],
@@ -125,24 +127,16 @@ for(const [label,mutate] of [
  if(spawnSync(process.execPath,[validator,root,reportPath,manifestPath,'--strict']).status===0) throw new Error(`${label} unexpectedly passed`);
 }
 console.log('Declared offscreen attribution and invalid tail/visible-cast spoof regressions passed.');
-// Synthetic native art lettering preserves exact transcription and tails.
-const ar=structuredClone(report),am=structuredClone(manifest);
-am.qa_scope={mode:'art-production-v1',authorized_by:'user',authorization:'Synthetic scope instruction: native source-faithful art QA; delivery QA deferred to CMS.',delivery_qa:'deferred_to_cms'};
-const native=ar.pages[0].visual_review;
-delete native.checks.mobile_readability;
-Object.assign(native,{full_size_checked:true,method:'Synthetic native original inspection record',native_image_path:outputPath,native_image_sha256:page.asset_hash});
-const artRun=(r=ar,m=am,flags=['--art-only'])=>{write(reportPath,r);write(manifestPath,m);return spawnSync(process.execPath,[validator,root,reportPath,manifestPath,...flags],{encoding:'utf8'});};
-let artResult=artRun();if(artResult.status!==0)throw new Error(`Native art lettering failed: ${artResult.stderr}`);
-if(artRun(ar,am,['--strict']).status===0)throw new Error('Default lettering must still require mobile');
+// Native inspection of the current original is always required; it never waives exact text or tails.
 for(const [label,mutate] of [
- ['missing authorization',(r,m)=>delete m.qa_scope.authorization],
- ['missing native original',(r,m)=>delete r.pages[0].visual_review.native_image_path],
- ['stale native hash',(r,m)=>r.pages[0].visual_review.native_image_sha256='0'.repeat(64)],
- ['wrong observed letters',(r,m)=>r.pages[0].bubbles[0].observed_text='Wrong source dialogue'],
- ['wrong tail target',(r,m)=>r.pages[0].bubbles[0].tail_geometry.target_character_id='OTHER'],
- ['face obscured',(r,m)=>r.pages[0].visual_review.checks.face_hands_props_clear.status='FAIL']
-]){const r=structuredClone(ar),m=structuredClone(am);mutate(r,m);if(artRun(r,m).status===0)throw new Error(`${label}: native scope unexpectedly waived semantic quality`);}
-console.log('Native art lettering: 8 synthetic scope/current-native/exact-text/tail cases PASS.');
+ ['full-size check missing',r=>r.pages[0].visual_review.full_size_checked=false],
+ ['missing method',r=>delete r.pages[0].visual_review.method],
+ ['missing native original',r=>delete r.pages[0].visual_review.native_image_path],
+ ['native path is not the original',r=>r.pages[0].visual_review.native_image_path=sourcePath],
+ ['stale native hash',r=>r.pages[0].visual_review.native_image_sha256='0'.repeat(64)],
+ ['wrong tail target',r=>r.pages[0].bubbles[0].tail_geometry.target_character_id='OTHER']
+]){const r=structuredClone(report);mutate(r);write(reportPath,r);write(manifestPath,manifest);if(spawnSync(process.execPath,[validator,root,reportPath,manifestPath,'--strict']).status===0)throw new Error(`${label} unexpectedly passed`);}
+console.log('Native original inspection: 6 synthetic current-native/tail cases PASS.');
 write(manifestPath,manifest);
 write(reportPath,report);
 fs.writeFileSync(outputPath,'new image bytes after review');

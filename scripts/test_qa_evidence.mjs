@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import {validateAssetReferences, validateReviewHash, validateLetteringCoverage} from './qa_evidence.mjs';
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'comic-qa-evidence-'));
 try {
- const ref=path.join(root,'SACVI_C01.png'); fs.writeFileSync(ref,'synthetic fixture bytes');
+ const ref=path.join(root,'PROP_DECREE.png'); fs.writeFileSync(ref,'synthetic fixture bytes');
  const hash=crypto.createHash('sha256').update(fs.readFileSync(ref)).digest('hex');
  const registry=new Map([['COSTUME_SACVI_QIPAO',{reference_file:ref,sha256:hash}]]);
  const run=(ids,files)=>validateAssetReferences(ids,files,registry,x=>path.resolve(root,x),x=>path.resolve(root,x),'test');

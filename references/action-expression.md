@@ -30,11 +30,11 @@ Set `performance_validation: {"enabled": true, "mode": "action-expression-v1"}` 
 - `acting` covers each declared `character_id` once. Record emotion before/now, integer intensity `0..3`, at least one face cue and body cue. A distant, back-facing, or occluded face uses an explicit visibility constraint plus the readable body cue; do not invent a visible mouth or eye. Calm source characters remain calm; do not make every actor shout.
 - Character design supplies an `acting_palette`: source-consistent emotion ranges, concrete brow/eyelid/gaze/mouth and neck/shoulder/hand/posture cues, restrained and intense variants, and disallowed out-of-character reactions. Identity locks preserve recognition signals; they do not freeze the reference's neutral facial muscles. If a needed expression cannot be judged from the neutral reference, use a supplemental image_gen reference or a visually validated expressive first-page image. A new sheet for every emotion or actor is not required.
 
-Run `node scripts/validate_action_expression.mjs --design-only --require-enabled <project-root> <storyboard.json>` before rendering. This checks the contract, not acting quality. Prompts must translate the declared physical/acting cues into visible instructions; “dynamic” and “expressive faces” alone are incomplete. When editing, explicitly release the old pose/expression where it caused the defect; preservation locks apply to identity and source continuity.
+Run `node <plugin>/scripts/validate_action_expression.mjs --design-only <project-root> <storyboard.json>` before rendering. This checks the contract, not acting quality. Prompts must translate the declared physical/acting cues into visible instructions; “dynamic” and “expressive faces” alone are incomplete. When editing, explicitly release the old pose/expression where it caused the defect; preservation locks apply to identity and source continuity.
 
 ## Visual acceptance after rendering
 
-Inspect final bytes at full resolution, then at an actual mobile width (280–480 px). For each panel, read the image without relying on dialogue: can the viewer locate the contact, infer movement/force or deliberate stillness, and distinguish the emotion through face and body? Compare the before/after beat, not only the character sheet. A stationary conversation can PASS with subtle source-consistent acting; an impact can FAIL despite exact identities and correct text.
+Inspect the final original bytes at full resolution. For each panel, read the image without relying on dialogue: can the viewer locate the contact, infer movement/force or deliberate stillness, and distinguish the emotion through face and body? Compare the before/after beat, not only the character sheet. A stationary conversation can PASS with subtle source-consistent acting; an impact can FAIL despite exact identities and correct text.
 
 Every final manifest page requires `performance_review`:
 
@@ -44,9 +44,10 @@ Every final manifest page requires `performance_review`:
   "asset_hash": "actual-final-image-sha256",
   "reviewer": "actual reviewer",
   "checked_at": "2026-10-09T00:00:00Z",
-  "method": "full-size pixels and mobile browser inspection",
-  "mobile_width_px": 390,
-  "screenshot_path": "reports/mobile/page-01.png",
+  "method": "full-size original pixel inspection",
+  "full_size_checked": true,
+  "native_image_path": "path to the exact original page image",
+  "native_image_sha256": "actual-final-image-sha256",
   "panels": [{
     "panel_id": "P01-01",
     "status": "PASS",
@@ -60,8 +61,8 @@ Every final manifest page requires `performance_review`:
 }
 ```
 
-The example is a schema, never ready-made evidence. Record actual observations, one review record per panel and actor, including silent characters. Store a real mobile screenshot file. The validator checks current image bytes, hash binding, evidence presence, matching designs and complete coverage; it does not see pixels, recognize emotions, or verify that a screenshot depicts the right image. The reviewer must establish that truthfully.
+The example is a schema, never ready-made evidence. Record actual observations, one review record per panel and actor, including silent characters. The validator checks current image bytes, native inspection binding, evidence presence, matching designs and complete coverage; it does not see pixels or recognize emotions. The reviewer must establish that truthfully.
 
 Any unreadable impact/consequence, implausibly frozen expression, contradictory body emotion, obscured contact, duplicate anatomy, failed record, stale image hash, or incomplete review makes the page `needs_revision`. Regenerate/edit only through image_gen and inspect the new bytes; changing JSON alone cannot repair pixels. After an image changes, redo performance, identity, asset, lettering and relevant continuity reviews.
 
-Run `node scripts/validate_action_expression.mjs --require-enabled <project-root> <storyboard.json> <manifest.json>` and the chapter command with `--require-performance` before handoff/copy. Historical chapters without the enabled contract return **SKIP**, which must be reported separately from PASS and never called an aesthetic approval. New/revised chapters require the enabled contract and cannot use historical SKIP.
+Run `node <plugin>/scripts/validate_action_expression.mjs <project-root> <storyboard.json> <manifest.json>` while iterating; the chapter QA gate runs it and always requires the enabled contract.

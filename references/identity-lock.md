@@ -87,7 +87,7 @@ Crowd figures use stable non-reference IDs and are visually subordinate to named
   "crowd_rendering": {
     "mode": "deemphasized",
     "crowd_ids": ["CANDIDATE_CROWD"],
-    "foreground_priority": ["VL_C1", "VTR_C1"],
+    "foreground_priority": ["HERO_A", "MENTOR_B"],
     "reference_files": [],
     "observed_crowd_ids": ["CANDIDATE_CROWD"]
   }
@@ -111,14 +111,14 @@ A crowd ID is not a visual instruction by itself. Its profile must define forbid
     "foreground_face_policy": "back_or_side_or_occluded",
     "variation_axes": ["face_shape", "hair_shape", "body_build", "pose", "scale", "focus", "contrast"],
     "exclusion_locks": {
-      "CANDIDATE_CROWD": ["VL_C1.face", "VL_C1.hair", "VL_C1.silhouette"]
+      "CANDIDATE_CROWD": ["HERO_A.face", "HERO_A.hair", "HERO_A.silhouette"]
     }
   },
   "crowd_visual_separation": {
     "status": "PASS",
-    "compared_against": ["VL_C1"],
+    "compared_against": ["HERO_A"],
     "observed_axes": ["face_shape", "hair_shape", "silhouette", "contrast"],
-    "evidence": "Thumbnail and mobile review show varied, soft background figures."
+    "evidence": "Full-size and thumbnail review show varied, soft background figures."
   }
 }
 ```

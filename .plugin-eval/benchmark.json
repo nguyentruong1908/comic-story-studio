@@ -11,7 +11,7 @@
     "extraArgs": []
   },
   "workspace": {
-    "sourcePath": "/Users/nguyenvantruong/Documents/ChatGPT/truyentranhvn/codex-plugins/comic-story-studio/scripts",
+    "sourcePath": "./scripts",
     "setupMode": "copy",
     "preserve": "on-failure"
   },
@@ -20,8 +20,8 @@
   },
   "verifiers": {
     "commands": [
-      "node --test test_source_coverage_validator.mjs test_dash_thought_coverage.mjs test_qa_evidence.mjs test_reader_manifest.mjs",
-      "python3 -B -m unittest discover -s . -p test_metadata_history.py",
+      "node --test test_*.mjs",
+      "python3 -B -m unittest discover -s . -p 'test_*.py'",
       "python3 -c \"import json; from pathlib import Path; assert isinstance(json.loads(Path('result.json').read_text()), dict)\""
     ]
   },
@@ -46,13 +46,13 @@
     },
     {
       "id": "fresh-independent-qa",
-      "title": "Independent QA and compact reader boundary",
-      "purpose": "Check unchanged evidence reuse, changed-image invalidation and fail-closed reader projection.",
-      "userInput": "Use Comic Story Studio QA and reader publish skills. Run test_qa_evidence.mjs and test_reader_manifest.mjs using Node tests. Write result.json explaining the evidence required after a single image changes, the unchanged evidence that may be reused, and why a compact reader needs a successful exact-byte full gate receipt. Use synthetic fixtures only; do not publish or fabricate an image inspection.",
+      "title": "Independent QA and chapter packaging boundary",
+      "purpose": "Check unchanged evidence reuse, changed-image invalidation and fail-closed chapter packaging.",
+      "userInput": "Use Comic Story Studio QA and packaging skills. Run test_qa_evidence.mjs and test_package_chapter.mjs using Node tests. Write result.json explaining the evidence required after a single image changes, the unchanged evidence that may be reused, and why packaging needs a current QA receipt written by validate_chapter_qa.mjs. Use synthetic fixtures only; do not fabricate an image inspection.",
       "successChecklist": [
         "Stale/missing/failed review evidence is rejected.",
-        "Compact projection never substitutes for full validators.",
-        "No production/public files are changed."
+        "Packaging never substitutes for full validators and refuses stale receipts.",
+        "No production files are changed."
       ]
     },
     {

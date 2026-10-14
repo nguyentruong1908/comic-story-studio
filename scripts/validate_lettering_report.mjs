@@ -1,17 +1,15 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import {validateQaScope, validateNativeInspection, pageOriginalPath} from './qa_scope.mjs';
-import {validateReviewHash} from './qa_evidence.mjs';
+import {validateReviewHash, validateNativeInspection, pageOriginalPath} from './qa_evidence.mjs';
 
 const args = process.argv.slice(2);
 const [rootArg, reportArg, manifestArg] = args.filter((a) => !a.startsWith('--'));
-const artOnly = args.includes('--art-only');
-const strict = args.includes('--strict') || artOnly;
+const strict = args.includes('--strict');
 const marginArg = args.find((a) => a.startsWith('--min-margin='));
 const minMargin = Number(marginArg?.split('=')[1] || 8);
 if (!rootArg || !reportArg) {
-  console.error('Usage: node validate_lettering_report.mjs [--art-only] <project-root> <lettering-report.json> [manifest.json] [--strict] [--min-margin=8]');
+  console.error('Usage: node validate_lettering_report.mjs <project-root> <lettering-report.json> [manifest.json] [--strict] [--min-margin=8]');
   process.exit(2);
 }
 const root = path.resolve(rootArg);
@@ -24,7 +22,6 @@ const pages = Array.isArray(report.pages) ? report.pages : (report.page ? [repor
 if (!pages.length) errors.push('report must contain pages[] or a single page record');
 let manifest = null;
 if (manifestArg) manifest = JSON.parse(fs.readFileSync(resolve(manifestArg), 'utf8'));
-errors.push(...validateQaScope(manifest, artOnly));
 const manifestPages = new Map((manifest?.pages || []).map((p) => [Number(p.page), p]));
 const area = (box) => Math.max(0, box[2] - box[0]) * Math.max(0, box[3] - box[1]);
 const intersect = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
@@ -44,11 +41,11 @@ for (const page of pages) {
     if (review?.status !== 'PASS') errors.push(`page ${pageNo}: visual_review.status must be PASS`);
     for (const key of ['reviewer', 'checked_at']) if (!String(review?.[key] || '').trim()) errors.push(`page ${pageNo}: visual_review missing ${key}`);
     if (manifestPages.has(pageNo)) errors.push(...validateReviewHash(root, manifestPages.get(pageNo), review, `page ${pageNo} visual_review`));
-    if (artOnly && manifestPages.has(pageNo)) {
+    if (manifestPages.has(pageNo)) {
       const actual = manifestPages.get(pageNo);
       errors.push(...validateNativeInspection(root, pageOriginalPath(actual), actual.asset_hash, review, `page ${pageNo} lettering`));
     }
-    for (const key of ['text_accuracy', 'balloon_placement', 'face_hands_props_clear', 'speaker_tail', 'reading_order', ...(artOnly ? [] : ['mobile_readability'])]) {
+    for (const key of ['text_accuracy', 'balloon_placement', 'face_hands_props_clear', 'speaker_tail', 'reading_order']) {
       const check = review?.checks?.[key];
       if (check?.status !== 'PASS') errors.push(`page ${pageNo}: visual_review ${key} must explicitly PASS`);
       if (!String(check?.evidence || '').trim()) errors.push(`page ${pageNo}: visual_review ${key} missing manual evidence`);

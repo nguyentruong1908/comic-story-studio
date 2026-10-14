@@ -5,10 +5,10 @@ The canonical plan is JSON and uses `comic-production-plan-v1`.
 ```json
 {
   "schema": "comic-production-plan-v1",
-  "plan_id": "tien-nghich-chapter-01",
-  "project": "tien-nghich",
+  "plan_id": "example-series-chapter-01",
+  "project": "example-series",
   "chapter": 1,
-  "source": "tien-nghich/source/chapter-01.txt",
+  "source": "source/chapter-01.txt",
   "created_at": "2026-10-05T00:00:00Z",
   "updated_at": "2026-10-05T00:00:00Z",
   "owner": "main-agent",
@@ -48,7 +48,7 @@ The canonical plan is JSON and uses `comic-production-plan-v1`.
 
 Allowed step statuses are `pending`, `in_progress`, `passed`, `needs_revision`, `blocked`, `user_approved`, and the narrowly scoped `skipped`. Allowed plan statuses are `draft`, `in_progress`, `blocked`, `needs_revision`, and `complete`.
 
-Only `S06_TOOLING_HARDENING` may use `skipped`, with `optional: true`, `tooling_changes_required: false` and an explicit reason passed as `--note`. Use it when no tool/contract engineering changes are needed. Its dependent steps may proceed, but full existing validators remain mandatory. Research, source, design, production, independent QA and publication gates cannot use this status. Preserve existing frozen plans until an explicit reviewed plan adoption; do not silently add skip flags.
+Only `S06_TOOLING_HARDENING` may use `skipped`, with `optional: true`, `tooling_changes_required: false` and an explicit reason passed as `--note`. Use it when no tool/contract engineering changes are needed. Its dependent steps may proceed, but full existing validators remain mandatory. Research, source, design, production, independent QA and packaging gates cannot use this status. Preserve existing frozen plans until an explicit reviewed plan adoption; do not silently add skip flags.
 
 `parallel_subagents.assignments` entries contain `agent_id`, `scope`, `status`, `inputs`, `outputs`, and `evidence`. The main agent is the only writer of the canonical plan after collecting those reports.
 

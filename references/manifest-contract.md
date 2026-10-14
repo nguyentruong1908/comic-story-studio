@@ -1,6 +1,6 @@
 # Comic manifest contract
 
-Keep two contracts: the full production/QA manifest below is the internal audit dossier; the compact `comic-reader-manifest-v1` projection is the reader payload. Full validators consume the dossier, never its compact projection. Reader paths must be relative to the reader root, use the repository's established `web/public/...` form, or be verified absolute paths contained in the explicitly declared reader root and supported by its path normalizer. Never point a reader manifest at a temporary generation directory.
+The production manifest below is the canonical audit dossier for one chapter. Validators read it directly. After the chapter gate passes, `package_chapter.mjs` turns it into a platform-neutral chapter package (see [Chapter package](#chapter-package)).
 
 Required full production/QA top-level fields:
 
@@ -47,60 +47,33 @@ When a chapter contains recurring or story-critical non-character visuals, add:
 
 ```json
 {
-  "asset_reference": "production/chapter-02/assets/asset-reference.json",
+  "asset_reference": "design/assets/asset-reference.json",
   "asset_validation": {"mode": "strict-v1", "registry_status": "approved", "reference_hashes_required": true, "visual_review_required": true},
-  "asset_ids": ["PROP_BUNDLE_VL_C2", "VEHICLE_CART_VTU_C2"]
+  "asset_ids": ["PROP_SATCHEL", "VEHICLE_CART"]
 }
 ```
 
-Allowed publication statuses:
+Allowed chapter statuses:
 
 - `draft`: source, cast, or storyboard is still changing.
 - `rendered_pending_review`: real images exist but the user has not approved them.
 - `needs_revision`: any identity, lettering, continuity, or asset QA failure.
-- `partial`: user-approved pages are available while the chapter remains intentionally incomplete.
-- `complete`: all planned pages exist and pass automated plus independent visual/semantic QA, with user approval or explicit authorization to publish while review is deferred. Deferral retains `user_image_approval: false` and an honest `user_review` status/authorization; it never becomes user-approved.
+- `partial`: user-approved pages exist while the chapter remains intentionally incomplete.
+- `complete`: all planned pages exist and pass automated plus independent visual/semantic QA, with user approval or explicit authorization to package while review is deferred. Deferral retains `user_image_approval: false` and an honest `user_review` status/authorization; it never becomes user-approved.
 
 Required full production/QA page fields:
 
 `page`, `image_path`, `panels`, `source_paragraphs`, `beat_id`, `entry_state`, `exit_state`, `transition_type`, `scene_goal`, `causal_link`, `asset_hash`, `qa_status`.
 
-Every page entering reader publication also requires a mobile delivery record. The canonical `image_path` and `asset_hash` remain internal artifact references; `mobile_delivery` is the only image projection allowed in reader metadata:
-
-```json
-{
-  "mobile_delivery": {
-    "profile": "mobile-extreme",
-    "image_path": "web/public/series/example/chapters/01/mobile/page-01.png",
-    "source_sha256": "<canonical page hash>",
-    "asset_hash": "<mobile derivative hash>",
-    "bytes": 546413,
-    "width": 448,
-    "height": 672,
-    "max_width": 448,
-    "max_height": 672,
-    "mime": "image/png",
-    "readability": {
-      "status": "PASS",
-      "asset_hash": "<mobile derivative hash>",
-      "reviewer": "mobile reviewer",
-      "checked_at": "2026-10-14T00:00:00Z"
-    }
-  }
-}
-```
-
-`build_reader_manifest.mjs` fails closed when this record is missing or stale and emits only `mobile_delivery.image_path`, its derivative hash and dimensions inside the `448x672` mobile box. Source pages with a taller portrait ratio keep their aspect ratio instead of being stretched. It never emits the canonical page path to the reader.
-
 Required full production/QA panel fields:
 
 `panel`, `panel_id`, `character_ids`, `reference_files`, `speaker_mapping`, `bubbles`, `reading_order`, `transition_from_previous`.
 
-For pipeline v3, each analysis beat must also define `must_retain` and `causal_check`. Each storyboard/production panel carries `retention_ids`, `retention_evidence`, `causal_role` (`trigger`, `response`, or `consequence` when applicable), and `expected_visible_character_ids`; visual QA records `observed_visible_character_ids`. The sets must match before publication. The chapter storyboard also carries `rendering.reference_snapshot` with approved/render timestamps and registry hashes.
+For pipeline v3, each analysis beat must also define `must_retain` and `causal_check`. Each storyboard/production panel carries `retention_ids`, `retention_evidence`, `causal_role` (`trigger`, `response`, or `consequence` when applicable), and `expected_visible_character_ids`; visual QA records `observed_visible_character_ids`. The sets must match before packaging. The chapter storyboard also carries `rendering.reference_snapshot` with approved/render timestamps and registry hashes.
 
 Principal first-appearance panels additionally require `introductions` with the character ID, mode, source paragraphs, canonical facts, and exact text when the mode is not visual-only.
 
-For `introduction_validation.mode: principal-first-appearance-v2`, each entry additionally requires `identity`, `cultivation`, `description`, and `field_order`. The order is identity/name first, cultivation level second when source-backed, then one short description. Unknown names or realms use `not_stated_in_source` and must not be invented in visible text.
+For `introduction_validation.mode: principal-first-appearance-v2`, each entry additionally requires `identity`, `rank`, `description`, and `field_order`. The order is identity/name first, rank second when source-backed (whatever standing the story uses: title, job, power level, team role), then one short description. Unknown names or ranks use `not_stated_in_source` and must not be invented in visible text.
 
 For any page whose location is a stair, ramp, cliff path, or other vertical route, copy a panel-level `motion_continuity` block from the storyboard. It fixes `scene_id`, `stair_axis`, `world_up_anchor`, `world_down_anchor`, `screen_up_direction`, `camera_facing`, visible contact landmarks, adjacent anchors, and per-character trajectories. Run `validate_motion_continuity.mjs`; omitted or reversed anchors are `needs_revision`.
 
@@ -116,7 +89,7 @@ Identity gate fields for production manifests:
     "reference_hashes_required": true,
     "visual_review_required": true
   },
-  "non_reference_character_ids": ["VILLAGER", "GUEST"],
+  "non_reference_character_ids": ["CROWD_BYSTANDER", "CROWD_GUARD"],
   "pages": [
     {
       "identity_review": {
@@ -131,16 +104,39 @@ Identity gate fields for production manifests:
 }
 ```
 
-Run the validator with `--strict-identity` before reader copy. It rejects missing or unapproved registries, stale reference hashes, cast/reference mismatches, incorrect speaker mappings, and pages without a passing identity review.
+Run the validator with `--strict-identity` before packaging (the chapter gate does this). It rejects missing or unapproved registries, stale reference hashes, cast/reference mismatches, incorrect speaker mappings, and pages without a passing identity review.
 
-Bubble text contains only the spoken/caption text. Speaker IDs belong in metadata. Keep bubbles ordered top-to-bottom and left-to-right, with tails pointing to the mapped speaker.
+Bubble text contains only the spoken/caption text. Speaker IDs belong in metadata; a bubble starting with a registered character ID, name or alias followed by `:` fails. `CAPTION`, `SFX` and `non_reference_character_ids` are the only speakers without an individual reference. Keep bubbles ordered top-to-bottom and left-to-right, with tails pointing to the mapped speaker.
 
 ## Mandatory image_gen provenance
 
 See [imagegen-only.md](imagegen-only.md). All content and lettering must come from Codex image_gen. Strict manifest and chapter QA block missing provenance or bytes differing from the original tool output. Script-rendered historical pages are not exempt.
 
-## Compact reader projection
+## Chapter package
 
-After full staged QA passes on the current input tuple, create and review the `mobile-extreme` derivative, then use [build_reader_manifest.mjs](../scripts/build_reader_manifest.mjs). The projection carries chapter/title/status, page count, honest user-review status, the exact full-manifest hash and each page's mobile number/path/hash/dimensions/optional alt. Keep source text, panels, canonical paths, reference registries, arguments and QA evidence in the retained full dossier. The projection never points at canonical originals and grants no visual approval.
+After `validate_chapter_qa.mjs ... --receipt qa-receipt.json` passes on the current inputs, run:
 
-The current projector requires all six reviewed page domains, complete planned coverage and genuine successful full-gate receipts; its explicit deferral adapter supports the authorized all-30 review policy. It does not upgrade a historical SKIP into PASS or automatically migrate legacy publications. The caller verifies receipt freshness against all current source/storyboard/reference/lettering inputs before projecting; manifest SHA alone cannot certify their freshness.
+```
+node <plugin>/scripts/package_chapter.mjs <project-root> <manifest.json> --receipt <qa-receipt.json> --out packages/chapter-01 [--mobile]
+```
+
+The packager refuses a receipt that is not `comic-qa-receipt-v1`, lacks any gate, or no longer matches the current manifest, analysis, storyboard or lettering bytes. It requires pages `1..N` equal to `planned_page_count`, copies each page's exact image_gen bytes to `pages/page-001.png`... after checking them against `asset_hash`, and writes `comic-package.json`:
+
+```json
+{
+  "schema": "comic-package-v1",
+  "chapter": 1,
+  "title": "Chapter title",
+  "page_count": 2,
+  "reading_order": "page-ascending",
+  "source_manifest_sha256": "<manifest hash>",
+  "qa_receipt_sha256": "<receipt hash>",
+  "mobile_max": {"width": 720, "height": 1080},
+  "pages": [{"page": 1, "file": "pages/page-001.png", "sha256": "<hash>", "bytes": 1234, "width": 1024, "height": 1536,
+    "mobile": {"file": "pages-mobile/page-001.png", "sha256": "<hash>", "bytes": 567, "width": 720, "height": 1080}}]
+}
+```
+
+`--mobile` adds `pages-mobile/` with each page fitted inside 720x1080 for phone reading: aspect ratio kept, never upscaled (smaller pages are copied unchanged), never cropped. `mobile_max` and each page's `mobile` record appear only with `--mobile`. Mobile copies are made after QA from the verified originals; QA itself always reviews the originals. The resize uses macOS `sips`.
+
+It never overwrites an existing package and builds in a temporary sibling folder, so a failure leaves nothing behind. The full manifest, references, arguments and QA evidence stay in the series folder as the audit trail.

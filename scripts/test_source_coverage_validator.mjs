@@ -4,73 +4,35 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'comic-source-coverage-'));
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
-const source = 'Cô Vợ Tổng Giám Đốc Xinh Đẹp Của Tôi\n\nÔng đặt giỏ xuống.\n\n- Mai tôi sẽ trở lại.\n\ntruyenfull,truyenfull vn\n';
+const front = 'Chương 1: Chuyến đò sớm', back = 'Hết chương 1.';
+const source = `${front}\n\nÔng đặt giỏ xuống.\n\n- Mai tôi sẽ trở lại.\n\n${back}\n`;
 fs.writeFileSync(path.join(root, 'source.txt'), source);
 fs.writeFileSync(path.join(root, 'page.png'), 'synthetic bytes; no comic image');
 const paragraphs = ['Ông đặt giỏ xuống.', '- Mai tôi sẽ trở lại.'].map((text, i) => ({paragraph_id: i + 1, start: source.indexOf(text), end: source.indexOf(text) + text.length, text, sha256: hash(text), units: [{unit_id: `U${i + 1}`, start: 0, end: text.length, sha256: hash(text), kind: i ? 'dialogue' : 'action', summary: i ? 'Người nói hẹn trở lại ngày mai.' : 'Ông đặt giỏ xuống đất.', speaker: i ? 'MAN' : null, treatment: i ? 'verbatim' : 'faithful_visual'}]}));
-const exclusions = [source.slice(0, source.indexOf('\n')), 'truyenfull,truyenfull vn'].map((text, i) => ({start: source.indexOf(text), end: source.indexOf(text) + text.length, sha256: hash(text), kind: i ? 'website_footer' : 'website_header'}));
-const coverage = {mode: 'paragraph-complete-v1', source_title: source.slice(0, source.indexOf('\n')), source_path: 'source.txt', source_sha256: hash(source), exclusions, paragraphs, decomposition_review: {status: 'PASS', reviewer: 'fixture', reviewed_at: '2026-10-09T00:00:00Z', evidence: 'Both paragraphs were read; the basket placement and complete promise are separate units.'}};
+const exclusions = [[front, 'front_matter', 'Chapter heading precedes the story.'], [back, 'back_matter', 'End-of-chapter marker follows the story.']].map(([text, kind, reason]) => ({start: source.indexOf(text), end: source.indexOf(text) + text.length, sha256: hash(text), kind, reason}));
+const coverage = {mode: 'paragraph-complete-v1', source_title: front, source_path: 'source.txt', source_sha256: hash(source), exclusions, paragraphs, decomposition_review: {status: 'PASS', reviewer: 'fixture', reviewed_at: '2026-10-09T00:00:00Z', evidence: 'Both paragraphs were read; the basket placement and complete promise are separate units.'}};
 const analysis = {source_coverage: coverage};
 const storyboard = {pages: [{page: 1, panels: [{panel_id: 'P1', source_unit_ids: ['U1', 'U2'], bubbles: [{id: 'B1', speaker: 'MAN', text: 'Mai tôi sẽ trở lại.'}], source_unit_realizations: [{unit_id: 'U1', treatment: 'faithful_visual', visual_action: 'Ông đặt giỏ xuống đất bên chân.', text_refs: []}, {unit_id: 'U2', treatment: 'verbatim', visual_action: 'Ông nói và nhìn người đối diện.', text_refs: [{bubble_id: 'B1', text: 'Mai tôi sẽ trở lại.'}]}]}]}]};
-const manifest = {pages: [{page: 1, panels: structuredClone(storyboard.pages[0].panels), image_path: 'page.png', source_unit_review: {status: 'PASS', asset_hash: hash(fs.readFileSync(path.join(root, 'page.png'))), reviewer: 'fixture', reviewed_at: '2026-10-09T00:00:00Z', source_compared: true, full_size_checked: true, mobile_checked: true, units: [{unit_id: 'U1', panel_id: 'P1', status: 'PASS', source_fact_retained: true, observed_evidence: 'The basket rests on the ground beside his feet.'}, {unit_id: 'U2', panel_id: 'P1', status: 'PASS', source_fact_retained: true, observed_evidence: 'The speech promise is visible and attributed to MAN.', observed_text: 'Mai tôi sẽ trở lại.', observed_speaker: 'MAN', dialogue_fidelity_checked: true}]}}]};
+// Synthetic native-inspection record; no real artwork reviewed.
+const pageHash = hash(fs.readFileSync(path.join(root, 'page.png')));
+const manifest = {pages: [{page: 1, panels: structuredClone(storyboard.pages[0].panels), image_path: 'page.png', source_unit_review: {status: 'PASS', asset_hash: pageHash, reviewer: 'fixture', reviewed_at: '2026-10-09T00:00:00Z', source_compared: true, full_size_checked: true, method: 'Synthetic original native inspection record', native_image_path: 'page.png', native_image_sha256: pageHash, units: [{unit_id: 'U1', panel_id: 'P1', status: 'PASS', source_fact_retained: true, observed_evidence: 'The basket rests on the ground beside his feet.'}, {unit_id: 'U2', panel_id: 'P1', status: 'PASS', source_fact_retained: true, observed_evidence: 'The speech promise is visible and attributed to MAN.', observed_text: 'Mai tôi sẽ trở lại.', observed_speaker: 'MAN', dialogue_fidelity_checked: true}]}}]};
 manifest.pages[0].source_unit_review.source_sha256 = hash(source);
 for (const observation of manifest.pages[0].source_unit_review.units) observation.source_unit_sha256 = paragraphs.flatMap(p => p.units).find(u => u.unit_id === observation.unit_id).sha256;
-const validator = path.join(path.dirname(new URL(import.meta.url).pathname), 'validate_source_coverage.mjs');
-const run = (a, s, m, design = false, flags = []) => {
+const validator = path.join(here, 'validate_source_coverage.mjs');
+const run = (a, s, m, design = false) => {
   for (const [name, value] of Object.entries({analysis: a, storyboard: s, manifest: m})) fs.writeFileSync(path.join(root, `${name}.json`), JSON.stringify(value));
-  return spawnSync(process.execPath, [validator, ...flags, '--require-enabled', ...(design ? ['--design-only'] : []), root, 'analysis.json', 'storyboard.json', ...(design ? [] : ['manifest.json'])], {encoding: 'utf8'});
+  return spawnSync(process.execPath, [validator, ...(design ? ['--design-only'] : []), root, 'analysis.json', 'storyboard.json', ...(design ? [] : ['manifest.json'])], {encoding: 'utf8'});
 };
 const clone = value => structuredClone(value);
 const good = run(analysis, storyboard, manifest);
-if (good.status !== 0) throw new Error(`Complete fixture must pass:\n${good.stdout}${good.stderr}`);
+if (good.status !== 0) throw new Error(`Complete fixture with front/back matter must pass:\n${good.stdout}${good.stderr}`);
 const design = run(analysis, storyboard, {}, true);
 if (design.status !== 0) throw new Error(`Design-only fixture must pass:\n${design.stdout}${design.stderr}`);
-// Synthetic native records exercise scoping; no real artwork reviewed.
-const artManifest = clone(manifest);
-artManifest.qa_scope = {mode:'art-production-v1', authorized_by:'user', authorization:'Synthetic scope instruction: accept source-faithful comic art with native QA; defer browser/mobile/reader delivery to CMS.', delivery_qa:'deferred_to_cms'};
-const artReview = artManifest.pages[0].source_unit_review;
-Object.assign(artReview,{mobile_checked:false,native_image_path:'page.png',native_image_sha256:artReview.asset_hash,method:'Synthetic original native inspection record'});
-const artRun = (m=artManifest,a=analysis,s=storyboard,flags=['--art-only']) => run(a,s,m,false,flags);
-if (artRun().status !== 0) throw new Error('Native art source coverage must pass without mobile review');
-if (artRun(artManifest,analysis,storyboard,[]).status === 0) throw new Error('Default source gate must still require mobile');
-for (const change of [m=>delete m.qa_scope, m=>delete m.pages[0].source_unit_review.native_image_path, m=>m.pages[0].source_unit_review.native_image_sha256='0'.repeat(64), m=>m.pages[0].source_unit_review.units.pop(), m=>m.pages[0].source_unit_review.units[1].observed_text='Wrong text']) {
-  const m=clone(artManifest);change(m);
-  if (artRun(m).status===0) throw new Error('Native scope must reject missing authorization/native/source/text evidence');
-}
-const omitted=clone(analysis);omitted.source_coverage.paragraphs.pop();
-if(artRun(artManifest,omitted).status===0) throw new Error('Native scope must reject omitted source paragraph');
-console.log('Native art source coverage: 8 synthetic scope/original/source-omission/transcription cases PASS.');
-// Capture metadata is permitted only immediately after the exact source title.
-const captureHeader = 'Nguồn: https://truyenfull.live/co-vo-tong-giam-doc-xinh-dep-cua-toi/chuong-1/\nNgày chụp nguồn: 2026-10-07 (Asia/Ho_Chi_Minh)';
-const captureAt = coverage.source_title.length + 2;
-const captureFixture = (header, at = captureAt) => {
-  const inserted = `${header}\n\n`;
-  const capturedSource = source.slice(0, at) + inserted + source.slice(at);
-  const a = clone(analysis), m = clone(manifest);
-  for (const p of a.source_coverage.paragraphs) if (p.start >= at) {p.start += inserted.length; p.end += inserted.length;}
-  for (const e of a.source_coverage.exclusions) if (e.start >= at) {e.start += inserted.length; e.end += inserted.length;}
-  a.source_coverage.exclusions.push({kind: 'source_provenance_metadata', start: at, end: at + header.length, sha256: hash(header)});
-  a.source_coverage.source_sha256 = hash(capturedSource);
-  m.pages[0].source_unit_review.source_sha256 = hash(capturedSource);
-  fs.writeFileSync(path.join(root, 'source.txt'), capturedSource);
-  return {a, m};
-};
-let capture = captureFixture(captureHeader);
-if (run(capture.a, storyboard, capture.m).status !== 0 || run(capture.a, storyboard, {}, true).status !== 0) throw new Error('Exact capture metadata must pass design and final checks');
-for (const [label, header, at] of [
-  ['wrong domain', captureHeader.replace('truyenfull.live', 'unrecognized.example'), captureAt],
-  ['hidden narrative', `${captureHeader}\nÔng giữ kín lời hứa.`, captureAt],
-  ['metadata after narrative', captureHeader, source.indexOf(paragraphs[1].text)],
-  ['extra prose', `${captureHeader} Ông rời đi.`, captureAt]
-]) {
-  capture = captureFixture(header, at);
-  const result = run(capture.a, storyboard, capture.m);
-  if (result.status === 0 || !`${result.stdout}${result.stderr}`.includes('source_provenance_metadata')) throw new Error(`Capture metadata ${label} must fail with scoped diagnostic`);
-}
-fs.writeFileSync(path.join(root, 'source.txt'), source);
 const cases = [
   ['missing contract', a => delete a.source_coverage, 'required'],
   ['unmapped paragraph', a => a.source_coverage.paragraphs.pop(), 'uncovered source'],
@@ -78,11 +40,18 @@ const cases = [
   ['overlapping units', a => a.source_coverage.paragraphs[0].units.push(clone(a.source_coverage.paragraphs[0].units[0])), 'overlap'],
   ['changed canonical source hash', a => a.source_coverage.source_sha256 = '0'.repeat(64), 'source hash'],
   ['false optional unit text', a => a.source_coverage.paragraphs[0].units[0].text = 'Ông vẫn cầm giỏ.', 'unit text mismatch'],
-  ['story hidden as website noise', a => {const p = a.source_coverage.paragraphs.pop(); a.source_coverage.exclusions.push({...p, kind: 'website_footer'});}, 'website_footer'],
+  ['unknown exclusion kind', a => a.source_coverage.exclusions[0].kind = 'website_header', 'front_matter or back_matter'],
+  ['missing exclusion reason', a => delete a.source_coverage.exclusions[1].reason, 'front_matter or back_matter'],
+  ['blank exclusion reason', a => a.source_coverage.exclusions[0].reason = ' ', 'front_matter or back_matter'],
+  ['stale exclusion hash', a => a.source_coverage.exclusions[1].sha256 = '0'.repeat(64), 'exclusion hash mismatch'],
   ['omitted unit in panel', (a, s) => {s.pages[0].panels[0].source_unit_ids.pop(); s.pages[0].panels[0].source_unit_realizations.pop();}, 'no planned panel'],
   ['shortened dialogue', (a, s) => {s.pages[0].panels[0].bubbles[0].text = 'Tôi trở lại.'; s.pages[0].panels[0].source_unit_realizations[1].text_refs[0].text = 'Tôi trở lại.';}, 'verbatim dialogue'],
   ['wrong speaker', (a, s) => s.pages[0].panels[0].bubbles[0].speaker = 'OTHER', 'speaker'],
   ['empty semantic review', a => a.source_coverage.decomposition_review.evidence = '', 'decomposition'],
+  ['no full-size check', (a, s, m) => m.pages[0].source_unit_review.full_size_checked = false, 'incomplete'],
+  ['missing native method', (a, s, m) => m.pages[0].source_unit_review.method = ' ', 'native inspection and method'],
+  ['missing native image path', (a, s, m) => delete m.pages[0].source_unit_review.native_image_path, 'native_image_path'],
+  ['stale native image hash', (a, s, m) => m.pages[0].source_unit_review.native_image_sha256 = '0'.repeat(64), 'native image hash'],
   ['stale visual evidence', (a, s, m) => m.pages[0].source_unit_review.asset_hash = '1'.repeat(64), 'stale'],
   ['stale source evidence', (a, s, m) => m.pages[0].source_unit_review.source_sha256 = '1'.repeat(64), 'stale source hash'],
   ['stale unit evidence', (a, s, m) => m.pages[0].source_unit_review.units[0].source_unit_sha256 = '1'.repeat(64), 'stale source-unit hash'],
@@ -105,6 +74,22 @@ for (const [label, mutate, diagnostic] of cases) {
   if (result.status === 0) throw new Error(`${label}: incomplete source evidence must fail`);
   if (!`${result.stdout}${result.stderr}`.toLowerCase().includes(diagnostic)) throw new Error(`${label}: missing diagnostic ${diagnostic}: ${result.stdout}${result.stderr}`);
 }
+const overlapA = clone(analysis);
+overlapA.source_coverage.paragraphs[0].units.push(clone(overlapA.source_coverage.paragraphs[0].units[0]));
+if (run(overlapA, storyboard, manifest).stderr.split('\n').filter(l => l.includes('overlap at offset')).length !== 1) throw new Error('An overlapping range must report one error, not one per character');
+// Exclusions may only trim matter around the story, never text between paragraphs.
+const note = 'Lời người chép chen giữa.', at = source.indexOf(paragraphs[1].text), shift = note.length + 2;
+const middleSource = source.slice(0, at) + `${note}\n\n` + source.slice(at);
+fs.writeFileSync(path.join(root, 'source.txt'), middleSource);
+for (const kind of ['front_matter', 'back_matter']) {
+  const a = clone(analysis), m = clone(manifest);
+  a.source_coverage.source_sha256 = m.pages[0].source_unit_review.source_sha256 = hash(middleSource);
+  for (const item of [a.source_coverage.paragraphs[1], a.source_coverage.exclusions[1]]) {item.start += shift; item.end += shift;}
+  a.source_coverage.exclusions.push({kind, reason: 'Transcriber note.', start: at, end: at + note.length, sha256: hash(note)});
+  const result = run(a, storyboard, m);
+  if (result.status === 0 || !result.stderr.includes(`${kind} exclusion must`)) throw new Error(`Mid-story ${kind} exclusion must fail:\n${result.stdout}${result.stderr}`);
+}
+fs.writeFileSync(path.join(root, 'source.txt'), source);
 const optionalText = clone(analysis);
 for (const paragraph of optionalText.source_coverage.paragraphs) delete paragraph.text;
 if (run(optionalText, storyboard, manifest).status !== 0) throw new Error('Hash-bound source offsets must pass without duplicated paragraph text');
@@ -131,8 +116,8 @@ paragraph.sha256 = hash(expandedLine);
 const secondText = ' Tôi hứa.';
 paragraph.units.push({unit_id: 'U3', start: originalLine.length, end: expandedLine.length, sha256: hash(secondText), kind: 'dialogue', summary: 'The speaker confirms the promise.', speaker: 'MAN', treatment: 'verbatim'});
 const footer = fragmentA.source_coverage.exclusions[1];
-footer.start = expandedSource.indexOf('truyenfull,truyenfull vn');
-footer.end = footer.start + 'truyenfull,truyenfull vn'.length;
+footer.start = expandedSource.indexOf(back);
+footer.end = footer.start + back.length;
 const bubble = fragmentS.pages[0].panels[0].bubbles[0];
 const firstText = 'Mai tôi sẽ trở lại.';
 bubble.text = `${firstText} Tôi hứa.`;
@@ -184,4 +169,4 @@ if (run(romanceA, narrativeS, narrativeM).status === 0) throw new Error('Narrati
 narrativeM.pages[0].source_unit_review.units[0].observed_text = 'Hai người trưởng thành ôm nhau và hôn nhẹ.';
 if (run(romanceA, narrativeS, narrativeM).status !== 0) throw new Error('Reviewed narrative caption transcription should pass');
 fs.rmSync(root, {recursive: true, force: true});
-console.log(`Source coverage validator passed: complete design/final, exact capture metadata, optional-text, faithful-text, shared-balloon, allowed-romance and narrative-text fixtures; ${cases.length + 13} omission/evidence regressions.`);
+console.log(`Source coverage validator passed: complete design/final with front/back matter, optional-text, faithful-text, shared-balloon, allowed-romance and narrative-text fixtures; ${cases.length + 12} omission/evidence/exclusion regressions.`);

@@ -4,7 +4,7 @@ Read this contract before analyzing, planning, rendering or reviewing any new or
 
 ## Source first, page count last
 
-Keep the canonical source unchanged. Identify website title/footer debris explicitly; never remove narrative content during normalization. Read every paragraph in order and split it into **atomic source units**: each action, descriptive detail, thought, dialogue clause, motivation, relationship/knowledge fact, uncertainty, transition and consequence. A long paragraph can need several units and several panels. Record the actor/speaker, objects and changed states, emotional intent, causal detail and exact dialogue; resolve neither source ambiguity nor consent uncertainty by invention.
+Keep the canonical source unchanged. Identify capture debris before or after the story (site titles, navigation, credits) explicitly; never remove narrative content during normalization. Read every paragraph in order and split it into **atomic source units**: each action, descriptive detail, thought, dialogue clause, motivation, relationship/knowledge fact, uncertainty, transition and consequence. A long paragraph can need several units and several panels. Record the actor/speaker, objects and changed states, emotional intent, causal detail and exact dialogue; resolve neither source ambiguity nor consent uncertainty by invention.
 
 Plan every unit's visible realization and exact text before choosing a page budget. Preserve the full conversation, including answers, conditions, threats, qualifiers and reactions. Default to verbatim dialogue, split across readable balloons/panels in source order. The usual word budget calls for more panels/pages; it does not authorize dropping words or details. Merge units only when the same panel clearly carries each fact. A one-line summary of a multi-action paragraph is not a detailed decomposition.
 
@@ -27,9 +27,8 @@ Store the following object in `analysis.source_coverage`, or point `analysis.sou
   "mode": "paragraph-complete-v1",
   "source_path": "source/chapter-05.txt",
   "source_sha256": "<SHA-256 of canonical source bytes>",
-  "source_title": "<exact website title if excluded>",
   "exclusions": [
-    {"start": 0, "end": 20, "sha256": "<exact slice hash>", "kind": "website_header"}
+    {"start": 0, "end": 20, "sha256": "<exact slice hash>", "kind": "front_matter", "reason": "<what this debris is and why it is not story>"}
   ],
   "paragraphs": [{
     "paragraph_id": 1, "start": 22, "end": 50,
@@ -48,7 +47,7 @@ Store the following object in `analysis.source_coverage`, or point `analysis.sou
 }
 ```
 
-Every nonwhitespace source character must belong to exactly one paragraph or a recognized website-noise exclusion. Every nonwhitespace paragraph character must belong to exactly one ordered unit. Website header exclusions must match the declared title at the beginning; footer exclusions permit recognized literal website tokens only. `source_provenance_metadata` permits only the exact two-line capture header immediately after that title: `Nguồn: https://truyenfull.vn/<slug>/chuong-<number>/` (or `truyenfull.live`), followed by `Ngày chụp nguồn: YYYY-MM-DD (Asia/Ho_Chi_Minh)`. It cannot contain additional prose, omit the title, or occur after any narrative. Extra website formats require an explicit reviewed validator change, not relabeling story text as noise.
+Every nonwhitespace source character must belong to exactly one paragraph or one exclusion. Every nonwhitespace paragraph character must belong to exactly one ordered unit. An exclusion has kind `front_matter` (it must end before the first story paragraph) or `back_matter` (it must start after the last story paragraph), its exact slice hash and a concrete `reason`. Exclusions can never sit between story paragraphs; the decomposition reviewer confirms they contain no story text. Never relabel story text as debris.
 
 Unit treatments:
 
@@ -80,7 +79,7 @@ Every carrier panel declares `source_unit_ids` and one matching `source_unit_rea
 
 Text refs use real panel bubble IDs and appear in reading order. Optional `text_start` and `text_end` are UTF-16 offsets within the actual bubble string; both are required together, bounded, nonempty, and `text` must equal that exact slice. Without offsets, `text` must equal the whole bubble. Multiple atomic clauses can share one natural balloon through fragments; ordered fragments jointly cover every nonwhitespace character of a verbatim/faithful-dialogue balloon, preventing an unsourced extra sentence. Concatenation across all carrier panels must reproduce the complete verbatim or approved adapted line. The observed text of each unit is its reviewed fragment; strict lettering QA still transcribes the complete balloon. Preserve these fields exactly in the final manifest; changed realizations or unknown final carriers fail. Unit first-carrier order must follow source order; textual carriers additionally follow the actual panel bubble array and fragment offsets, including when several source units share a panel; secondary panels can carry ongoing consequences.
 
-After inspecting the actual final pixels at full size and mobile width, each manifest page has `source_unit_review` with `status`, `asset_hash`, `source_sha256` (current canonical source hash), `reviewer`, `reviewed_at`, `source_compared: true`, `full_size_checked: true`, `mobile_checked: true`, and `units`. Each unit observation has `unit_id`, `panel_id`, `source_unit_sha256` (current unit anchor hash), `status: "PASS"`, `source_fact_retained: true`, and concrete `observed_evidence`. Every unit with planned text refs also has `observed_text` equal to those exact carried fragments, including narration/thought text; expression alone cannot prove a written fact. Dialogue also has `observed_speaker` when known, and `dialogue_fidelity_checked: true`. Non-graphic adaptations additionally have `cause_preserved: true`, `consequence_preserved: true` and concrete `adaptation_evidence`; observed adapted text must match when lettering was planned. Review every carrier, including secondary panels, rather than one observation for the whole chapter.
+After inspecting the actual final original pixels at full size, each manifest page has `source_unit_review` with `status`, `asset_hash`, `source_sha256` (current canonical source hash), `reviewer`, `reviewed_at`, `source_compared: true`, `full_size_checked: true`, `method`, `native_image_path`, `native_image_sha256`, and `units`. Each unit observation has `unit_id`, `panel_id`, `source_unit_sha256` (current unit anchor hash), `status: "PASS"`, `source_fact_retained: true`, and concrete `observed_evidence`. Every unit with planned text refs also has `observed_text` equal to those exact carried fragments, including narration/thought text; expression alone cannot prove a written fact. Dialogue also has `observed_speaker` when known, and `dialogue_fidelity_checked: true`. Non-graphic adaptations additionally have `cause_preserved: true`, `consequence_preserved: true` and concrete `adaptation_evidence`; observed adapted text must match when lettering was planned. Review every carrier, including secondary panels, rather than one observation for the whole chapter.
 
 Do not copy planned prose into observed evidence. A missing clause, conversation, inner thought or state detail is `needs_revision` even if source offsets and hashes are structurally complete. A regenerated page requires fresh source-unit review bound to its new bytes. The validator checks anchor/evidence integrity; it cannot recognize images or prove semantic completeness.
 
@@ -89,14 +88,14 @@ Do not copy planned prose into observed evidence. A missing clause, conversation
 After approved references and full storyboard mapping, before the first chapter-page image generation:
 
 ```bash
-node scripts/validate_source_coverage.mjs --design-only --require-enabled <project-root> <analysis.json> <storyboard.json>
+node <plugin>/scripts/validate_source_coverage.mjs --design-only <project-root> <analysis.json> <storyboard.json>
 ```
 
 After final image QA:
 
 ```bash
-node scripts/validate_source_coverage.mjs --require-enabled <project-root> <analysis.json> <storyboard.json> <manifest.json>
-node scripts/validate_chapter_qa.mjs <project-root> <analysis.json> <storyboard.json> <manifest.json> --lettering-report <report.json> --require-performance --require-source-coverage
+node <plugin>/scripts/validate_source_coverage.mjs <project-root> <analysis.json> <storyboard.json> <manifest.json>
+node <plugin>/scripts/validate_chapter_qa.mjs <project-root> <analysis.json> <storyboard.json> <manifest.json> --lettering-report <report.json> --receipt <qa-receipt.json>
 ```
 
-Both chapter QA entrypoints accept `--require-source-coverage`. Enabled contracts always run; absent historical contracts report **SKIP**, never exhaustive fidelity PASS. Require the flag for every new or revised chapter. Run `scripts/test_source_coverage_validator.mjs` after changing this contract.
+The contract is always required; a missing contract fails. Run `<plugin>/scripts/test_source_coverage_validator.mjs` after changing this contract.

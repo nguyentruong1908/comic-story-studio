@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 // Regression: a punctuation heuristic must not invent speech after explicit silence.
 // Conversely, relabeling speech as thought cannot hide text, attribution or evidence.
@@ -31,15 +33,16 @@ const storyboard = {pages: [{page: 1, panels: [{panel_id: 'P1', source_unit_ids:
 ]}]}]};
 fs.writeFileSync(path.join(root, 'source.txt'), source);
 fs.writeFileSync(path.join(root, 'page.png'), 'Synthetic hash fixture, not comic art.');
-const manifest = {pages: [{page: 1, panels: structuredClone(storyboard.pages[0].panels), image_path: 'page.png', source_unit_review: {status: 'PASS', reviewer: 'synthetic-fixture', reviewed_at: '2026-10-11T00:00:00Z', source_compared: true, full_size_checked: true, mobile_checked: true, source_sha256: hash(source), asset_hash: hash(fs.readFileSync(path.join(root, 'page.png'))), units: [
+const pageHash = hash(fs.readFileSync(path.join(root, 'page.png')));
+const manifest = {pages: [{page: 1, panels: structuredClone(storyboard.pages[0].panels), image_path: 'page.png', source_unit_review: {status: 'PASS', reviewer: 'synthetic-fixture', reviewed_at: '2026-10-11T00:00:00Z', source_compared: true, full_size_checked: true, method: 'Synthetic native inspection record', native_image_path: 'page.png', native_image_sha256: pageHash, source_sha256: hash(source), asset_hash: pageHash, units: [
   {unit_id: 'N1', panel_id: 'P1', source_unit_sha256: hash(silent), status: 'PASS', source_fact_retained: true, observed_evidence: 'Closed lips retain the silence.'},
   {unit_id: 'T1', panel_id: 'P1', source_unit_sha256: hash(first), status: 'PASS', source_fact_retained: true, observed_evidence: 'First complete self-question in a tailless thought.', observed_text: 'Mình thắng rồi sao?', observed_speaker: 'WOMAN', dialogue_fidelity_checked: true},
   {unit_id: 'T2', panel_id: 'P1', source_unit_sha256: hash(second), status: 'PASS', source_fact_retained: true, observed_evidence: 'Second complete self-question remains hers.', observed_text: second, observed_speaker: 'WOMAN', dialogue_fidelity_checked: true}
 ]}}]};
-const validator = path.join(path.dirname(new URL(import.meta.url).pathname), 'validate_source_coverage.mjs');
+const validator = path.join(here, 'validate_source_coverage.mjs');
 const run = (a, s, m, design = true) => {
   for (const [name, value] of Object.entries({analysis: a, storyboard: s, manifest: m})) fs.writeFileSync(path.join(root, `${name}.json`), JSON.stringify(value));
-  return spawnSync(process.execPath, [validator, '--require-enabled', ...(design ? ['--design-only'] : []), root, 'analysis.json', 'storyboard.json', ...(design ? [] : ['manifest.json'])], {encoding: 'utf8'});
+  return spawnSync(process.execPath, [validator, ...(design ? ['--design-only'] : []), root, 'analysis.json', 'storyboard.json', ...(design ? [] : ['manifest.json'])], {encoding: 'utf8'});
 };
 try {
   for (const design of [true, false]) {
@@ -60,7 +63,7 @@ try {
     ['audible speech tail', (a, s) => s.pages[0].panels[0].bubbles[0].tail = 'Points to WOMAN mouth'],
     ['shortened thought', (a, s) => {s.pages[0].panels[0].bubbles[1].text = 'Mình không vui?'; s.pages[0].panels[0].source_unit_realizations[2].text_refs[0].text = 'Mình không vui?';}],
     ['omitted thought carrier', (a, s) => {s.pages[0].panels[0].source_unit_ids.pop(); s.pages[0].panels[0].source_unit_realizations.pop();}],
-    ['thought disguised as website noise', a => {const p = a.source_coverage.paragraphs.pop(); a.source_coverage.exclusions.push({...p, kind: 'website_footer'});}],
+    ['thought disguised as back matter', a => {const p = a.source_coverage.paragraphs.pop(); a.source_coverage.exclusions.push({...p, kind: 'back_matter', reason: 'Trailing note.'});}],
     ['unreviewed source decomposition', a => a.source_coverage.decomposition_review.evidence = '']
   ];
   for (const [label, mutate] of cases) {
@@ -80,7 +83,7 @@ try {
     const m = structuredClone(manifest); mutate(m);
     assert.equal(run(analysis, storyboard, m, false).status, 1, `${label} must block final evidence`);
   }
-  console.log(`Dash thought source coverage passed: complete design/final and ${cases.length + 6} attribution, text, noise and evidence rejection cases.`);
+  console.log(`Dash thought source coverage passed: complete design/final and ${cases.length + 6} attribution, text, exclusion and evidence rejection cases.`);
 } finally {
   fs.rmSync(root, {recursive: true, force: true});
 }

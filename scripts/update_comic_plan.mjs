@@ -108,5 +108,7 @@ else if (stepStatuses.some((status) => status === 'in_progress')) plan.status = 
 else if (!plan.status || !planStatuses.has(plan.status)) plan.status = 'draft';
 
 plan.updated_at = now;
-fs.writeFileSync(planPath, `${JSON.stringify(plan, null, 2)}\n`);
+// Write then rename so a crash never leaves a half-written canonical plan.
+fs.writeFileSync(`${planPath}.tmp`, `${JSON.stringify(plan, null, 2)}\n`);
+fs.renameSync(`${planPath}.tmp`, planPath);
 console.log(`Updated ${stepId}: ${previousStatus} -> ${nextStatus}; plan status=${plan.status}`);

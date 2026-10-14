@@ -26,14 +26,6 @@ function localPath(root, relative) {
   }
   return target;
 }
-function workspacePath(seriesRoot, workspaceRoot, relative) {
-  requireValue(nonempty(relative) && !path.isAbsolute(relative) && !relative.includes('\\') && !relative.includes('\0'), `Invalid workspace path: ${relative}`);
-  const target = path.resolve(seriesRoot, relative);
-  requireValue(inside(workspaceRoot, target) && target !== workspaceRoot, `Path outside workspace: ${relative}`);
-  const suffix = path.relative(workspaceRoot, target).split(path.sep).join('/');
-  localPath(workspaceRoot, suffix);
-  return target;
-}
 export function checkSeries(indexFile, chapterNumber) {
   const index = path.resolve(indexFile);
   requireValue(path.basename(index) === 'series.json', 'Context index must be named series.json');
@@ -48,7 +40,7 @@ export function checkSeries(indexFile, chapterNumber) {
   const workspace = path.dirname(root);
   requireValue(['.','..'].includes(data.validator_root), 'validator_root must explicitly be . or ..');
   const validator = path.resolve(root, data.validator_root);
-  for (const key of ['source','research','design','plans','manifests','production','archive']) {
+  for (const key of ['source','research','design','plans','manifests','production','packages','archive']) {
     localPath(root, data.directories?.[key]);
   }
   requireValue(data.resources && !Array.isArray(data.resources), 'Resources map required');
@@ -91,16 +83,13 @@ export function checkSeries(indexFile, chapterNumber) {
   }
   requireValue(data.active_chapter === null || data.chapters[String(data.active_chapter)], 'Active chapter is not indexed');
   requireValue(!Number.isNaN(Date.parse(data.updated_at)), 'updated_at required');
-  const readerRoot = workspacePath(root, workspace, data.reader?.root);
-  const publishRoot = workspacePath(root, workspace, data.reader?.publish_root);
-  requireValue(inside(readerRoot, publishRoot) && readerRoot !== publishRoot, 'Publish root must be within reader root');
   const resources = {};
   for (const [role, id] of Object.entries({...Object.fromEntries(globalIds.map(k=>[k,k])), ...(chapter?.resources || {})})) {
     const resource = data.resources[id];
     const file = localPath(root, resource.path);
     resources[role] = {...resource, resource_id:id, path:file, validator_argument:path.relative(validator, file).split(path.sep).join('/')};
   }
-  return {data, root, workspace, validator, chapter, summary:{status:'context_valid', meaning:'Paths and hashes only; no design/render/QA/publish approval', series_id:data.series_id, series_root:root, workspace_root:workspace, validator_root:validator, chapter:selected, next_action:chapter?.next_action || 'Import canonical sources, then research before design', blockers:chapter?.blockers || [], resources, reader_root:readerRoot, publish_root:publishRoot}};
+  return {data, root, workspace, validator, chapter, summary:{status:'context_valid', meaning:'Paths and hashes only; no design/render/QA/package approval', series_id:data.series_id, series_root:root, workspace_root:workspace, validator_root:validator, chapter:selected, next_action:chapter?.next_action || 'Import canonical sources, then research before design', blockers:chapter?.blockers || [], resources}};
 }
 export function checkJobs(indexFile, jobFiles) {
   const context = checkSeries(indexFile);
@@ -164,13 +153,13 @@ export function initSeries(workspaceRoot, seriesId, title = seriesId) {
   const root = path.join(workspace,seriesId);
   requireValue(!fs.existsSync(root), 'Series folder already exists; map it explicitly without moving/overwriting assets');
   requireValue(nonempty(title), 'Title required');
-  const directories = {source:'source',research:'research',design:'design',plans:'production/plans',manifests:'production/manifests',production:'production',archive:'archive'};
+  const directories = {source:'source',research:'research',design:'design',plans:'production/plans',manifests:'production/manifests',production:'production',packages:'packages',archive:'archive'};
   fs.mkdirSync(root);
-  for (const dir of ['source/raw','research','design/characters','design/assets','production/plans','production/manifests','archive']) fs.mkdirSync(path.join(root,dir), {recursive:true});
-  const instructions = `# ${title}\n\nRead workspace AGENTS.md, this file and series.json before work. Use comic-project-setup and the plugin project-layout contract.\n\n- All series content stays in this series folder; shared reader and plugin stay at workspace root.\n- Resolve resource IDs through series.json; present means file exists, never approval. Read actual plan/review evidence for authorization.\n- Internet research precedes reference design, storyboard, render and world/style QA. Use Codex web search/open first.\n- All art, references and lettering use Codex image_gen. Code only metadata, inspection, hashes and unchanged-byte copy.\n- Main agent owns series.json, canonical plans, registries, manifests and published copies. Workers only write their job scope and own report.\n- Validate indexed hashes and job snapshots before work and before merge. Keep rejected versions/evidence; never invent PASS, provenance or user approval.\n`;
+  for (const dir of ['source/raw','research','design/characters','design/assets','production/plans','production/manifests','packages','archive']) fs.mkdirSync(path.join(root,dir), {recursive:true});
+  const instructions = `# ${title}\n\nRead workspace AGENTS.md, this file and series.json before work. Use comic-project-setup and the plugin project-layout contract.\n\n- All series content stays in this series folder; the plugin stays outside it.\n- Resolve resource IDs through series.json; present means file exists, never approval. Read actual plan/review evidence for authorization.\n- Internet research precedes reference design, storyboard, render and world/style QA. Use Codex web search/open first.\n- All art, references and lettering use Codex image_gen. Code only metadata, inspection, hashes and unchanged-byte copy.\n- Main agent owns series.json, canonical plans, registries, manifests and chapter packages. Workers only write their job scope and own report.\n- Validate indexed hashes and job snapshots before work and before merge. Keep rejected versions/evidence; never invent PASS, provenance or user approval.\n`;
   fs.writeFileSync(path.join(root,'AGENTS.md'),instructions, {flag:'wx'});
   const planned = file => ({path:file,availability:'planned'});
-  const data = {schema:'comic-series-v1',series_id:seriesId,title,layout:'standard-v1',workspace_root:'..',validator_root:'.',directories,resources:{instructions:{path:'AGENTS.md',availability:'present',sha256:digest(path.join(root,'AGENTS.md'))},world_research:planned('research/world-style.json'),world_design_review:planned('research/design-review.json'),character_registry:planned('design/characters/character-reference.json'),asset_registry:planned('design/assets/asset-reference.json')},chapters:{},active_chapter:null,reader:{root:'../web',publish_root:`../web/public/series/${seriesId}/chapters`},updated_at:new Date().toISOString()};
+  const data = {schema:'comic-series-v1',series_id:seriesId,title,layout:'standard-v1',workspace_root:'..',validator_root:'.',directories,resources:{instructions:{path:'AGENTS.md',availability:'present',sha256:digest(path.join(root,'AGENTS.md'))},world_research:planned('research/world-style.json'),world_design_review:planned('research/design-review.json'),character_registry:planned('design/characters/character-reference.json'),asset_registry:planned('design/assets/asset-reference.json')},chapters:{},active_chapter:null,updated_at:new Date().toISOString()};
   fs.writeFileSync(path.join(root,'series.json'),JSON.stringify(data,null,2)+'\n', {flag:'wx'});
   return checkSeries(path.join(root,'series.json')).summary;
 }

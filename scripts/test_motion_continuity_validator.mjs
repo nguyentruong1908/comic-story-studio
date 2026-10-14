@@ -3,9 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const root = process.cwd();
-const validator = path.resolve(root, 'codex-plugins/comic-story-studio/scripts/validate_motion_continuity.mjs');
+const validator = path.join(here, 'validate_motion_continuity.mjs');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'comic-motion-validator-'));
 const storyboardPath = path.join(temp, 'storyboard.json');
 const manifestPath = path.join(temp, 'manifest.json');

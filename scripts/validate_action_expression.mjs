@@ -3,14 +3,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {isDeepStrictEqual} from 'node:util';
-import {validateQaScope, validateNativeInspection, pageOriginalPath} from './qa_scope.mjs';
-import {validateReviewHash} from './qa_evidence.mjs';
+import {validateReviewHash, validateNativeInspection, pageOriginalPath} from './qa_evidence.mjs';
 const args = process.argv.slice(2);
-const artOnly = args.includes('--art-only');
-const designOnly = args.includes('--design-only'), required = args.includes('--require-enabled') || artOnly;
+const designOnly = args.includes('--design-only');
 const positional = args.filter(arg => !arg.startsWith('--'));
-if (args.some(arg => arg.startsWith('--') && !['--design-only', '--require-enabled', '--art-only'].includes(arg)) || positional.length < 2 || positional.length > 3 || (!designOnly && positional.length !== 3)) {
-  console.error('Usage: node validate_action_expression.mjs [--art-only] [--design-only] [--require-enabled] <project-root> <storyboard.json> [manifest.json]');
+if (args.some(arg => arg.startsWith('--') && arg !== '--design-only') || positional.length < 2 || positional.length > 3 || (!designOnly && positional.length !== 3)) {
+  console.error('Usage: node validate_action_expression.mjs [--design-only] <project-root> <storyboard.json> [manifest.json]');
   process.exit(2);
 }
 const [rootArg, storyboardArg, manifestArg] = positional, root = path.resolve(rootArg);
@@ -21,11 +19,7 @@ try {
   manifest = manifestArg ? JSON.parse(fs.readFileSync(resolve(manifestArg), 'utf8')) : null;
 } catch (error) { console.error(`Action-expression QA failed: ${error.message}`); process.exit(1); }
 const boardGate = storyboard.performance_validation, manifestGate = manifest?.performance_validation;
-if (!boardGate?.enabled && !manifestGate?.enabled && !required) {
-  console.log('Action-expression QA SKIP: historical chapter has no enabled performance contract; visual quality is not certified.');
-  process.exit(0);
-}
-const errors = validateQaScope(manifest || storyboard, artOnly), text = value => typeof value === 'string' && Boolean(value.trim());
+const errors = [], text = value => typeof value === 'string' && Boolean(value.trim());
 const needText = (object, keys, label) => { for (const key of keys) if (!text(object?.[key])) errors.push(`${label}: missing ${key}`); };
 const list = (value, label, min = 0) => {
   if (!Array.isArray(value) || value.length < min || value.some(item => !text(item))) errors.push(`${label}: expected ${min ? 'nonempty ' : ''}array of concrete cue strings`);
@@ -92,13 +86,9 @@ if (!designOnly && manifest) {
     const review = page.performance_review;
     if (review?.status !== 'PASS') errors.push(`${label}: passing performance_review required`);
     errors.push(...validateReviewHash(root, page, review, `${label} performance_review`));
-    needText(review, ['reviewer', 'checked_at', 'method', ...(artOnly ? [] : ['screenshot_path'])], `${label} performance_review`);
+    needText(review, ['reviewer', 'checked_at', 'method'], `${label} performance_review`);
     if (!Number.isFinite(Date.parse(review?.checked_at))) errors.push(`${label}: invalid review checked_at`);
-    if (artOnly) errors.push(...validateNativeInspection(root, pageOriginalPath(page), page.asset_hash, review, `${label} performance_review`));
-    else {
-      if (!Number.isInteger(review?.mobile_width_px) || review.mobile_width_px < 280 || review.mobile_width_px > 480) errors.push(`${label}: mobile_width_px must record an actual mobile width (280..480)`);
-      if (!text(review?.screenshot_path) || !fs.existsSync(resolve(review.screenshot_path)) || !fs.statSync(resolve(review.screenshot_path)).isFile()) errors.push(`${label}: missing mobile screenshot evidence file`);
-    }
+    errors.push(...validateNativeInspection(root, pageOriginalPath(page), page.asset_hash, review, `${label} performance_review`));
     const covered = new Set();
     if (!Array.isArray(review?.panels)) errors.push(`${label}: missing reviewed panels`);
     for (const item of review?.panels || []) {

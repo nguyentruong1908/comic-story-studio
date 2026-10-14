@@ -2,32 +2,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {validateQaScope} from './qa_scope.mjs';
 import {validateCharacterDistinctiveness} from './validate_character_distinctiveness.mjs';
 import {validateAssetReferences, validateReviewHash} from './qa_evidence.mjs';
 import {validateImagegenProvenance} from './validate_imagegen_provenance.mjs';
 
 const cliArgs = process.argv.slice(2);
-const artOnly = cliArgs.includes('--art-only');
-const strictIdentity = cliArgs.includes('--strict-identity') || artOnly;
-const positionalArgs = cliArgs.filter((arg) => !['--strict-identity', '--art-only'].includes(arg));
+const strictIdentity = cliArgs.includes('--strict-identity');
+const positionalArgs = cliArgs.filter((arg) => arg !== '--strict-identity');
 const [rootArg, manifestArg] = positionalArgs;
 if (!rootArg || !manifestArg) {
-  console.error('Usage: node validate_comic_manifest.mjs [--art-only] [--strict-identity] <project-root> <manifest.json>');
+  console.error('Usage: node validate_comic_manifest.mjs [--strict-identity] <project-root> <manifest.json>');
   process.exit(2);
 }
 
 const root = path.resolve(rootArg);
-const manifestPath = path.resolve(manifestArg);
+const manifestPath = path.resolve(root, manifestArg);
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-const errors = validateQaScope(manifest, artOnly);
+const errors = [];
 const warnings = [];
 const published = new Set(['partial', 'complete']);
 if (strictIdentity || published.has(manifest.status)) {
   errors.push(...validateImagegenProvenance(root, manifest));
-  errors.push(...validateCharacterDistinctiveness(root, manifest, {artOnly}));
+  errors.push(...validateCharacterDistinctiveness(root, manifest));
 }
-const prefix = /^(?:vương\s+lâm|tứ\s+thúc|tôn\s+đại\s+trụ|trương\s+hổ|trương\s+cuồng|vương\s+hạo|lý\s+sơn|hứa\s+mộc|lữ\s+tung|người kể chuyện|đại\s+bá|vương\s+trác|người\s+trong\s+thôn)\s*:/iu;
 const hashRe = /^[a-f0-9]{64}$/i;
 const introductionModes = new Set(['source_dialogue', 'source_caption', 'visual_establishing', 'reaction_plus_visual']);
 const introductionPassStatuses = new Set(['planned', 'internal_pass', 'user_approved']);
@@ -59,7 +56,7 @@ function canonicalReference(file) {
 
 // The identity gate is deterministic: it cannot recognize a face from pixels,
 // but it prevents a generated page from carrying the wrong reference, stale
-// reference hash, or unreviewed identity status into the reader.
+// reference hash, or unreviewed identity status into the chapter.
 const identityEnabled = strictIdentity || Boolean(manifest.character_reference);
 const identityPassStatuses = new Set(['internal_pass', 'user_approved']);
 let registry = new Map();
@@ -68,44 +65,34 @@ const assetIdentityEnabled = Boolean(manifest.asset_validation) || (strictIdenti
 let assetRegistry = new Map();
 let assetRegistryDir = root;
 const nonReferenceCharacterIds = new Set(Array.isArray(manifest.non_reference_character_ids) ? manifest.non_reference_character_ids : []);
-if (identityEnabled) {
-  if (!manifest.character_reference) {
-    errors.push('identity gate: missing manifest.character_reference (use an approved character registry)');
-  } else {
-    const registryPath = resolveProjectPath(manifest.character_reference);
-    if (!registryPath || !fs.existsSync(registryPath)) {
-      errors.push(`identity gate: missing character registry ${registryPath || '(empty)'}`);
-    } else {
-      try {
-        const registryJson = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-        registryDir = path.dirname(registryPath);
-        if (!String(registryJson.status || '').toLowerCase().startsWith('approved')) {
-          errors.push(`identity gate: character registry is not approved (status=${registryJson.status || 'missing'})`);
-        }
-        if (!Array.isArray(registryJson.characters) || registryJson.characters.length === 0) {
-          errors.push('identity gate: character registry must contain a non-empty characters array');
-        } else {
-          for (const entry of registryJson.characters) {
-            const id = String(entry.character_id || '').trim();
-            if (!id || !entry.reference_file || !entry.sha256) {
-              errors.push(`identity gate: registry entry is missing character_id, reference_file, or sha256 (${id || 'unknown'})`);
-              continue;
-            }
-            if (registry.has(id)) errors.push(`identity gate: duplicate registry character_id ${id}`);
-            registry.set(id, entry);
-            const referencePath = resolveRegistryReference(entry.reference_file, registryDir);
-            if (!referencePath || !fs.existsSync(referencePath)) {
-              errors.push(`identity gate: missing reference for ${id}: ${referencePath || entry.reference_file}`);
-            } else if (sha256(referencePath) !== String(entry.sha256).toLowerCase()) {
-              errors.push(`identity gate: reference hash mismatch for ${id}`);
-            }
-          }
-        }
-      } catch (error) {
-        errors.push(`identity gate: cannot parse character registry ${registryPath}: ${error.message}`);
-      }
+// Character and asset registries share one shape: an approved list of
+// {id, reference_file, sha256} rows whose reference bytes must be current.
+function loadRegistry(gate, label, registryRef, listKey, idKey, required) {
+  const entries = new Map();
+  let dir = root;
+  if (!registryRef) { errors.push(`${gate}: missing manifest.${label}_reference (use an approved ${label} registry)`); return {entries, dir}; }
+  const registryPath = resolveProjectPath(registryRef);
+  if (!registryPath || !fs.existsSync(registryPath)) { errors.push(`${gate}: missing ${label} registry ${registryPath || '(empty)'}`); return {entries, dir}; }
+  try {
+    const json = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    dir = path.dirname(registryPath);
+    if (!String(json.status || '').toLowerCase().startsWith('approved')) errors.push(`${gate}: ${label} registry is not approved (status=${json.status || 'missing'})`);
+    if (!Array.isArray(json[listKey]) || json[listKey].length === 0) { errors.push(`${gate}: ${label} registry must contain a non-empty ${listKey} array`); return {entries, dir}; }
+    for (const entry of json[listKey]) {
+      const id = String(entry[idKey] || '').trim();
+      if (!id || required.some(key => !entry[key])) { errors.push(`${gate}: registry entry is missing ${[idKey, ...required].join(', ')} (${id || 'unknown'})`); continue; }
+      if (entries.has(id)) errors.push(`${gate}: duplicate registry ${idKey} ${id}`);
+      entries.set(id, entry);
+      const referencePath = resolveRegistryReference(entry.reference_file, dir);
+      if (!referencePath || !fs.existsSync(referencePath)) errors.push(`${gate}: missing reference for ${id}: ${referencePath || entry.reference_file}`);
+      else if (sha256(referencePath) !== String(entry.sha256).toLowerCase()) errors.push(`${gate}: reference hash mismatch for ${id}`);
     }
-  }
+  } catch (error) { errors.push(`${gate}: cannot parse ${label} registry ${registryPath}: ${error.message}`); }
+  return {entries, dir};
+}
+
+if (identityEnabled) {
+  ({entries: registry, dir: registryDir} = loadRegistry('identity gate', 'character', manifest.character_reference, 'characters', 'character_id', ['reference_file', 'sha256']));
   if (!Array.isArray(manifest.character_ids) || manifest.character_ids.length === 0) {
     errors.push('identity gate: manifest.character_ids must list the stable recurring cast');
   } else {
@@ -116,43 +103,7 @@ if (identityEnabled) {
 }
 
 if (assetIdentityEnabled) {
-  if (!manifest.asset_reference) {
-    errors.push('asset gate: missing manifest.asset_reference (use an approved asset registry)');
-  } else {
-    const assetRegistryPath = resolveProjectPath(manifest.asset_reference);
-    if (!assetRegistryPath || !fs.existsSync(assetRegistryPath)) {
-      errors.push(`asset gate: missing asset registry ${assetRegistryPath || '(empty)'}`);
-    } else {
-      try {
-        const assetRegistryJson = JSON.parse(fs.readFileSync(assetRegistryPath, 'utf8'));
-        assetRegistryDir = path.dirname(assetRegistryPath);
-        if (!String(assetRegistryJson.status || '').toLowerCase().startsWith('approved')) {
-          errors.push(`asset gate: asset registry is not approved (status=${assetRegistryJson.status || 'missing'})`);
-        }
-        if (!Array.isArray(assetRegistryJson.assets) || assetRegistryJson.assets.length === 0) {
-          errors.push('asset gate: asset registry must contain a non-empty assets array');
-        } else {
-          for (const entry of assetRegistryJson.assets) {
-            const id = String(entry.asset_id || '').trim();
-            if (!id || !entry.reference_file || !entry.sha256 || !entry.kind) {
-              errors.push(`asset gate: registry entry is missing asset_id, kind, reference_file, or sha256 (${id || 'unknown'})`);
-              continue;
-            }
-            if (assetRegistry.has(id)) errors.push(`asset gate: duplicate registry asset_id ${id}`);
-            assetRegistry.set(id, entry);
-            const referencePath = resolveRegistryReference(entry.reference_file, assetRegistryDir);
-            if (!referencePath || !fs.existsSync(referencePath)) {
-              errors.push(`asset gate: missing reference for ${id}: ${referencePath || entry.reference_file}`);
-            } else if (sha256(referencePath) !== String(entry.sha256).toLowerCase()) {
-              errors.push(`asset gate: reference hash mismatch for ${id}`);
-            }
-          }
-        }
-      } catch (error) {
-        errors.push(`asset gate: cannot parse asset registry ${assetRegistryPath}: ${error.message}`);
-      }
-    }
-  }
+  ({entries: assetRegistry, dir: assetRegistryDir} = loadRegistry('asset gate', 'asset', manifest.asset_reference, 'assets', 'asset_id', ['kind', 'reference_file', 'sha256']));
   if (!Array.isArray(manifest.asset_ids)) errors.push('asset gate: manifest.asset_ids must be an array of stable asset IDs');
   else for (const id of manifest.asset_ids) if (!assetRegistry.has(id)) errors.push(`asset gate: unknown top-level asset_id ${id}`);
 }
@@ -193,11 +144,11 @@ if (introductionEnabled) {
       if (entry.mode !== 'source_dialogue' && entry.speaker && !['CAPTION', 'NARRATION'].includes(String(entry.speaker))) errors.push(`introduction gate: ${id} non-dialogue speaker must be CAPTION or NARRATION`);
       if (introductionV2) {
         const identity = entry.identity;
-        const cultivation = entry.cultivation;
+        const rank = entry.rank;
         const description = entry.description;
         const order = Array.isArray(entry.field_order) ? entry.field_order : [];
         const expectedOrder = Array.isArray(introductionValidation.field_order) && introductionValidation.field_order.length
-          ? introductionValidation.field_order : ['identity', 'cultivation', 'description'];
+          ? introductionValidation.field_order : ['identity', 'rank', 'description'];
         if (JSON.stringify(order) !== JSON.stringify(expectedOrder)) errors.push(`introduction gate: ${id} field_order must be ${expectedOrder.join(' -> ')}`);
         if (!identity || typeof identity !== 'object' || Array.isArray(identity)) errors.push(`introduction gate: ${id} needs identity/name status`);
         else {
@@ -207,13 +158,14 @@ if (introductionEnabled) {
           if (nameStatus !== 'source_backed' && String(identity.name || '').trim()) errors.push(`introduction gate: ${id} must not invent a name when status is ${nameStatus}`);
           if (!Array.isArray(identity.aliases)) errors.push(`introduction gate: ${id} identity.aliases must be an array`);
         }
-        if (!cultivation || typeof cultivation !== 'object' || Array.isArray(cultivation)) errors.push(`introduction gate: ${id} needs cultivation level status`);
+        // rank = whatever standing the genre uses (title, job, power level, team role).
+        if (!rank || typeof rank !== 'object' || Array.isArray(rank)) errors.push(`introduction gate: ${id} needs rank status`);
         else {
-          const cultivationStatus = String(cultivation.status || '').trim();
-          if (!['source_backed', 'not_stated_in_source', 'deferred_to_source'].includes(cultivationStatus)) errors.push(`introduction gate: ${id} cultivation.status is invalid`);
-          if (cultivationStatus === 'source_backed' && !String(cultivation.level || '').trim()) errors.push(`introduction gate: ${id} source-backed cultivation level is empty`);
-          if (cultivationStatus !== 'source_backed' && String(cultivation.level || '').trim()) errors.push(`introduction gate: ${id} must not invent cultivation level when status is ${cultivationStatus}`);
-          if (!Array.isArray(cultivation.source_paragraphs)) errors.push(`introduction gate: ${id} cultivation.source_paragraphs must be an array`);
+          const rankStatus = String(rank.status || '').trim();
+          if (!['source_backed', 'not_stated_in_source', 'deferred_to_source'].includes(rankStatus)) errors.push(`introduction gate: ${id} rank.status is invalid`);
+          if (rankStatus === 'source_backed' && !String(rank.level || '').trim()) errors.push(`introduction gate: ${id} source-backed rank level is empty`);
+          if (rankStatus !== 'source_backed' && String(rank.level || '').trim()) errors.push(`introduction gate: ${id} must not invent rank level when status is ${rankStatus}`);
+          if (!Array.isArray(rank.source_paragraphs)) errors.push(`introduction gate: ${id} rank.source_paragraphs must be an array`);
         }
         if (!description || typeof description !== 'object' || Array.isArray(description) || !String(description.text || '').trim()) errors.push(`introduction gate: ${id} needs a short description`);
         else if (!Array.isArray(description.facts) || description.facts.length === 0) errors.push(`introduction gate: ${id} description.facts must be a non-empty array`);
@@ -228,6 +180,12 @@ if (introductionEnabled) {
   }
 }
 
+// A bubble must not start with "<speaker name>:"; names come from this series' registry.
+const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const speakerNames = [...registry.entries()].flatMap(([id, entry]) => [id, entry.name, ...(Array.isArray(entry.aliases) ? entry.aliases : [])])
+  .concat([...nonReferenceCharacterIds]).map(name => String(name || '').trim()).filter(Boolean);
+const prefix = speakerNames.length ? new RegExp(`^(?:${speakerNames.map(escapeRegex).join('|')})\\s*:`, 'iu') : null;
+const isNonReferenceSpeaker = speaker => ['CAPTION', 'SFX'].includes(speaker) || nonReferenceCharacterIds.has(speaker);
 const seenAssets = new Map();
 const seenPanels = new Set();
 for (const [index, page] of (manifest.pages || []).entries()) {
@@ -286,7 +244,7 @@ for (const [index, page] of (manifest.pages || []).entries()) {
         if (!panelEntry) errors.push(`introduction gate: ${id} first appearance panel ${entry.first_appearance_panel} needs introductions entry`);
         else {
           for (const key of ['mode', 'source_paragraphs', 'facts']) if (JSON.stringify(panelEntry[key]) !== JSON.stringify(entry[key])) errors.push(`introduction gate: ${id} panel metadata mismatch for ${key}`);
-          if (introductionV2) for (const key of ['identity', 'cultivation', 'description', 'field_order']) if (JSON.stringify(panelEntry[key]) !== JSON.stringify(entry[key])) errors.push(`introduction gate: ${id} panel metadata mismatch for ${key}`);
+          if (introductionV2) for (const key of ['identity', 'rank', 'description', 'field_order']) if (JSON.stringify(panelEntry[key]) !== JSON.stringify(entry[key])) errors.push(`introduction gate: ${id} panel metadata mismatch for ${key}`);
           if (String(panelEntry.text || '').trim() !== String(entry.text || '').trim()) errors.push(`introduction gate: ${id} panel text does not match character_introductions`);
         }
       }
@@ -378,7 +336,7 @@ for (const [index, page] of (manifest.pages || []).entries()) {
         errors.push(`page ${pageNo} panel ${panelId}: character_ids/reference_files mismatch (${sortedIds.join(',')} vs ${sortedReferenceIds.join(',')})`);
       }
       for (const [speaker, mappedReference] of Object.entries(panel.speaker_mapping || {})) {
-        if (mappedReference === null || mappedReference === undefined || ['CAPTION', 'SFX', 'VILLAGER', 'GUEST'].includes(speaker)) continue;
+        if (mappedReference === null || mappedReference === undefined || isNonReferenceSpeaker(speaker)) continue;
         if (!ids.includes(speaker) && !isOffscreenSpeaker(speaker)) errors.push(`page ${pageNo} panel ${panelId}: speaker ${speaker} is not in character_ids`);
         const mappedPath = canonicalReference(resolveProjectPath(mappedReference));
         const approvedPath = registry.has(speaker) ? canonicalReference(resolveRegistryReference(registry.get(speaker).reference_file, registryDir)) : null;
@@ -393,8 +351,8 @@ for (const [index, page] of (manifest.pages || []).entries()) {
     if (words > 35) errors.push(`page ${pageNo} panel ${panelId}: ${words} words exceed panel budget`);
     for (const bubble of bubbles) {
       if (!String(bubble.text || '').trim()) errors.push(`page ${pageNo} panel ${panelId}: blank bubble`);
-      if (prefix.test(String(bubble.text || '').trim())) errors.push(`page ${pageNo} panel ${panelId}: speaker prefix in bubble`);
-      if (String(bubble.speaker || '').trim() && !panel.character_ids.includes(bubble.speaker) && !isOffscreenSpeaker(bubble.speaker) && !['CAPTION', 'SFX', 'VILLAGER', 'GUEST'].includes(bubble.speaker)) {
+      if (prefix?.test(String(bubble.text || '').trim())) errors.push(`page ${pageNo} panel ${panelId}: speaker prefix in bubble`);
+      if (String(bubble.speaker || '').trim() && !(panel.character_ids || []).includes(bubble.speaker) && !isOffscreenSpeaker(bubble.speaker) && !isNonReferenceSpeaker(bubble.speaker)) {
         const message = `page ${pageNo} panel ${panelId}: speaker ${bubble.speaker} is not in character_ids`;
         if (identityEnabled) errors.push(`identity gate: ${message}`);
         else warnings.push(message);
