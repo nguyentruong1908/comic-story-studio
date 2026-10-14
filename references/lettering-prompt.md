@@ -1,0 +1,17 @@
+# Lettering before the first image_gen call
+
+Compile a concise lettering map before rendering: exact visible text, speaker or caption/thought kind, reading order, and placement for every carrier. Preserve source words, diacritics, punctuation, uncertainty and intentional source censorship. Metadata IDs and speaker labels are not visible text. Do not ask image_gen to proofread, paraphrase or autocorrect canonical source names.
+
+Put these rules in the actual prompt, not only the plan:
+
+- Quote the final text strings verbatim and give the required balloon/caption count. Adjacent compatible clauses may share a natural balloon with their source offsets retained. Never split fragments merely to inflate the page count.
+- Reserve clean empty lettering zones before composing faces, hands and props. Use generous normal-width Vietnamese glyphs, internal padding and canvas clearance; add room before reducing type size. No condensed letters or decorative headings.
+- Captions have no speaker tail. For speech, declare the visible speaker and one short unambiguous tail directed toward that speaker's face/head region, ending outside the face. A clear attribution does not require the tip to touch the mouth. Each tail stays clear of other balloons and faces; never connect balloons by a tail. Offscreen attribution must be explicitly planned.
+- Bind the visual mouth state to the carrier: a visible speaker's speech panel needs a readable speaking mouth or an explicitly declared offscreen/occluded speaker; a closed-mouth aftermath cue belongs only to a caption or a later reaction carrier. Do not describe a character as speaking while the same panel instruction closes the mouth.
+- Before render, reject contradictory panel metadata: every visible speech carrier must declare `speech_mouth_phase: open` (or an explicit offscreen/occluded attribution), with any `aftermath_phase: closed` attached only to a later reaction beat. If a panel exceeds its word-density limit, expand the reserved text zone or split at source-unit boundaries; never delete, merge away or compress source wording to fit.
+- Keep dialogue reading order and separate turns visually clear. Do not invent extra words, duplicated lines, ellipses, names, SFX, balloons or actors.
+- Keep every actual prompt within the real 32,000-character limit and current five-reference input contract. If frozen literal panel research blocks exceed one call, distribute them across a genuine predecessor-linked chain whose union covers all required panels/references. Each call carries the global style and concrete whole-page source/identity invariants; never submit a known oversized prompt.
+
+Self-check every final original image against this map before handoff: read all words and diacritics, count the carriers, verify each speaker/tail and inspect face/hand/prop clearance. This is native art QA; browser/mobile delivery tests belong to the separately requested publication workflow.
+
+For a real lettering defect, edit with image_gen only. Explicitly release the defective text or balloon geometry while preserving correct source, identity, acting and neighboring carriers. Repeating “preserve layout” while asking an edge-touching box to move creates conflicting instructions. A failed targeted edit must change the diagnosis/prompt; after two unsuccessful targeted attempts, involve another reviewer. Retain genuine arguments and outcomes; metadata edits never repair pixels.

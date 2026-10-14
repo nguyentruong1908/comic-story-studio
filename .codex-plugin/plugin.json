@@ -1,0 +1,60 @@
+{
+  "name": "comic-story-studio",
+  "version": "0.2.0",
+  "description": "Research-first comic production with unified series folders, agent context and scoped handoffs, reviewed world design, image_gen, source fidelity, QA and publishing.",
+  "author": {
+    "name": "Codex local workspace"
+  },
+  "license": "MIT",
+  "keywords": [
+    "action-expression",
+    "art-direction",
+    "asset-design",
+    "character-design",
+    "character-introduction",
+    "comic",
+    "continuity",
+    "crowd-separation",
+    "dialogue-fidelity",
+    "image-generation",
+    "internet-research",
+    "manga",
+    "manhua",
+    "non-reference-cast",
+    "paragraph-completeness",
+    "parallel-agents",
+    "production-plan",
+    "quality-assurance",
+    "reader-publishing",
+    "story-analysis",
+    "storyboard",
+    "webtoon",
+    "world-design",
+    "agent-context",
+    "series-workspace"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Comic Story Studio",
+    "shortDescription": "Research, design, produce and review faithful comics",
+    "longDescription": "A reusable research-first studio for every comic genre. Internet research distinguishes canonical facts, official adaptation observations, subject references and design choices before character or environment design. Scoped art direction is transferred into storyboards and actual image prompts, with current hash-bound design and page reviews alongside source, identity, action, lettering and imagegen provenance gates. Each series uses a resource index and explicit folder/root contract; persisted agent jobs freeze inputs and define write ownership, with mapped adoption for existing projects.",
+    "developerName": "Codex local workspace",
+    "category": "Creativity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Set up a comic series workspace, then research its world, character roles, costumes and environments before design",
+      "Design and produce source-faithful chapters using reviewed research, individual references and readable embedded lettering",
+      "Audit comic identity, world/style, source coverage and final pixels before publishing to a reader"
+    ],
+    "brandColor": "#D97743",
+    "composerIcon": "./assets/comic-story-studio.svg",
+    "logo": "./assets/comic-story-studio.svg",
+    "screenshots": [],
+    "websiteURL": "https://local.codex/comic-story-studio",
+    "privacyPolicyURL": "https://local.codex/comic-story-studio/privacy",
+    "termsOfServiceURL": "https://local.codex/comic-story-studio/terms"
+  }
+}

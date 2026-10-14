@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {validateAssetReferences, validateReviewHash, validateLetteringCoverage} from './qa_evidence.mjs';
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'comic-qa-evidence-'));
+try {
+ const ref=path.join(root,'SACVI_C01.png'); fs.writeFileSync(ref,'synthetic fixture bytes');
+ const hash=crypto.createHash('sha256').update(fs.readFileSync(ref)).digest('hex');
+ const registry=new Map([['COSTUME_SACVI_QIPAO',{reference_file:ref,sha256:hash}]]);
+ const run=(ids,files)=>validateAssetReferences(ids,files,registry,x=>path.resolve(root,x),x=>path.resolve(root,x),'test');
+ assert.deepEqual(run(['COSTUME_SACVI_QIPAO'],[ref]),[]);
+ const impostor=path.join(root,'COSTUME_SACVI_QIPAO.png'); fs.copyFileSync(ref,impostor);
+ assert.ok(run(['COSTUME_SACVI_QIPAO'],[impostor]).length,'same bytes but wrong registry path must fail');
+ assert.ok(run(['COSTUME_SACVI_QIPAO'],[]).length,'missing reference must fail');
+ fs.writeFileSync(ref,'changed bytes');
+ assert.ok(run(['COSTUME_SACVI_QIPAO'],[ref]).some(x=>x.includes('hash mismatch')));
+ const page={page:1,image_path:ref,asset_hash:hash};
+ assert.ok(validateReviewHash(root,page,{asset_hash:hash},'review').length,'changed bytes invalidate unchanged metadata');
+ page.asset_hash=crypto.createHash('sha256').update(fs.readFileSync(ref)).digest('hex');
+ assert.ok(validateReviewHash(root,page,{asset_hash:hash},'review').length,'regenerated page invalidates stale review');
+ assert.ok(validateReviewHash(root,page,{},'review').length);
+ assert.deepEqual(validateReviewHash(root,page,{asset_hash:page.asset_hash},'review'),[]);
+ assert.deepEqual(validateLetteringCoverage({pages:[page]},[{pages:[{page:1}]}]),[]);
+ assert.ok(validateLetteringCoverage({pages:[page,{page:2}]},[{pages:[{page:1}]}]).length);
+ assert.ok(validateLetteringCoverage({pages:[page]},[{pages:[{page:1},{page:1}]}]).length);
+ assert.ok(validateLetteringCoverage({pages:[page]},[{pages:[{page:1},{page:3}]}]).length);
+ console.log('QA evidence regression passed: exact reference mapping, stale bytes/reviews, complete report coverage.');
+} finally {fs.rmSync(root,{recursive:true,force:true});}
